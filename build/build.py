@@ -74,6 +74,12 @@ MAIN_PRODUCT = "Trader Lucrativo · Vendas"
 # Produto PRINCIPAL (front-end): nome do produto na Hotmart CONTÉM este texto.
 MAIN_PRODUCT_MATCH = "trader lucrativo"
 MAIN_PRODUCT_SHORT = "Trader Lucrativo"
+# Funil de produtos (por COMPRADOR): front -> upsell -> (se recusar) downsell. Tudo que o comprador do
+# front compra depois e não é upsell/downsell vira LTV (ex.: Sala Educacional), fora do ROAS do funil.
+UPSELL_MATCH = ("dna expert 6",)      # DNA Expert 6 meses (R$ 697) — upsell
+DOWNSELL_MATCH = ("dna expert 3",)    # DNA Expert 3 meses (R$ 397) — downsell
+ROLE_LABELS = {"front": "Front", "up": "Upsell", "down": "Downsell", "ltv": "LTV"}
+LINK_TOLERANCE_MIN = 10               # upsell gravado até 10 min ANTES do front ainda conta como do mesmo comprador
 # Prefixo comum a TODAS as campanhas do funil:  DTL | E6-VEN | P2-FRIO | CONV | ABO | 2026-10-18 | Teste de Ads
 MAIN_PRODUCT_PREFIX = "DTL"
 
@@ -108,7 +114,8 @@ SAMPLE_MIN_SPEND = 150.0   # gasto mínimo (R$, sem imposto) p/ JULGAR um anúnc
 SAMPLE_MIN_VENDAS = 2      # vendas mínimas p/ julgar com segurança
 TOP_ADS_N = 10
 # Metas & parâmetros (DEFAULTS do painel editável; o gestor edita no navegador).
-META_CPA = 297.0           # CPA alvo (R$/venda). Padrão = ticket do produto (ROAS 1,0 no front-end).
+META_CPA = None            # CPA alvo (R$/venda do front). None = usa o CPA de EQUILÍBRIO do funil
+                           # (ticket médio front+upsell+downsell por comprador, calculado no navegador).
 META_ROAS = None           # ROAS alvo (x) — opcional, só referência visual
 VOLUME_MIN_AMOSTRAL = SAMPLE_MIN_VENDAS
 N_DIAS_CORTE = 3
@@ -428,6 +435,17 @@ def is_test_sale(product: str, name: str, email: str) -> bool:
     return bool(re.match(r"^(teste|test)\d*$", first))
 
 
+def product_role(p: str) -> str:
+    n = norm(p)
+    if norm(MAIN_PRODUCT_MATCH) in n:
+        return "front"
+    if any(m in n for m in UPSELL_MATCH):
+        return "up"
+    if any(m in n for m in DOWNSELL_MATCH):
+        return "down"
+    return "ltv"
+
+
 def product_short(p: str) -> str:
     s = (p or "").strip()
     if norm(MAIN_PRODUCT_MATCH) in norm(s):
@@ -583,20 +601,15 @@ def process(vendas_rows, meta_rows):
             refunded += 1
     dup_total = sum(b["dup"] for b in buys.values())
 
-    # IDs de campanha do funil DTL (para decidir o back-end)
+    # IDs de campanha do funil DTL (para decidir o que entra quando não há vínculo pelo comprador)
     dtl_ids = set(cid for cid, cn in camp_id_map.items() if nkey(cn).startswith(nkey(MAIN_PRODUCT_PREFIX)))
     for b in buys.values():
-        if norm(MAIN_PRODUCT_MATCH) in norm(b["product"]) and b["f"]["cid"]:
+        if product_role(b["product"]) == "front" and b["f"]["cid"]:
             dtl_ids.add(b["f"]["cid"])
 
-    sales = []
-    lvl_count = Counter()
-    src_count = Counter()
-    ids_sem_nome = 0
-    for b in sorted(buys.values(), key=lambda x: x["dt"]):
-        f = b["f"]
+    def attribute(f):
+        """Origem + dimensões da UTM de UMA compra (sem olhar o comprador)."""
         src = classify_source(f)
-        main = 1 if norm(MAIN_PRODUCT_MATCH) in norm(b["product"]) else 0
         plat, pos = platform_of(f)
         camp = adset = ad = None
         lvl = "none"
@@ -637,36 +650,75 @@ def process(vendas_rows, meta_rows):
                 if len(hits) == 1:
                     camp, adset, ad = hits[0]
             lvl = "ad" if ad else ("adset" if adset else ("camp" if camp else "none"))
-            if lvl != "ad" and (cid or num_ids):
-                ids_sem_nome += 1
-        # escopo: produto principal sempre; outros produtos só se vierem de campanha DTL
-        if not main:
-            in_dtl = src == "meta" and ((camp is not None and nkey(camp).startswith(nkey(MAIN_PRODUCT_PREFIX)))
-                                        or (cid in dtl_ids)
-                                        or nkey(f["campaign"]).startswith(nkey(MAIN_PRODUCT_PREFIX) + " |"))
-            if not in_dtl:
-                continue
-        lvl_count[lvl if src == "meta" else src] += 1
-        src_count[src] += 1
-        cid_label = None
-        if src == "meta" and camp is None:
-            cid_label = f"(ID {cid})" if cid else "(campanha não identificada)"
+        in_dtl = src == "meta" and ((camp is not None and nkey(camp).startswith(nkey(MAIN_PRODUCT_PREFIX)))
+                                    or (cid in dtl_ids)
+                                    or nkey(f["campaign"]).startswith(nkey(MAIN_PRODUCT_PREFIX) + " |"))
+        cid_label = (f"(ID {cid})" if cid else "(campanha não identificada)") if (src == "meta" and camp is None) else None
+        return {
+            "src": src, "plat": plat, "pos": pos,
+            "camp": camp if camp is not None else cid_label,
+            "adset": adset if adset is not None else ("(não identificado)" if src == "meta" else None),
+            "ad": ad if ad is not None else ("(não identificado)" if src == "meta" else None),
+            "lvl": lvl if src == "meta" else None,
+            "cid": cid, "ids": " · ".join(num_ids) if num_ids else None, "in_dtl": in_dtl,
+        }
+
+    _RANK = {"ad": 3, "adset": 2, "camp": 1, "none": 0}
+    rank = lambda a: _RANK.get(a["lvl"], 0) if a["src"] == "meta" else -1
+
+    # compradores do FRONT (e-mail -> compras do front em ordem)
+    ordered = sorted(buys.values(), key=lambda x: x["dt"])
+    attr = {id(b): attribute(b["f"]) for b in ordered}
+    who_of = lambda b: norm(b["email"]) or (norm(b["name"]) + re.sub(r"\D", "", b["phone"])[-8:])
+    fronts: dict[str, list] = defaultdict(list)
+    for b in ordered:
+        if product_role(b["product"]) == "front" and not b.get("rf"):
+            fronts[who_of(b)].append(b)
+
+    sales = []
+    lvl_count = Counter()
+    src_count = Counter()
+    role_count = Counter()
+    via_count = Counter()
+    ids_sem_nome = 0
+    for b in ordered:
+        role = product_role(b["product"])
+        a = attr[id(b)]
+        via = "utm"
+        lag = None
+        if role != "front":
+            # vínculo pelo COMPRADOR: a compra do front mais recente até esta (tolerância de 10 min,
+            # porque o upsell às vezes é gravado no mesmo minuto ou antes do front)
+            prev = [x for x in fronts.get(who_of(b), ()) if x["dt"] <= b["dt"] + timedelta(minutes=LINK_TOLERANCE_MIN)]
+            if prev:
+                fr = prev[-1]
+                fa = attr[id(fr)]
+                lag = max(0, round((b["dt"] - fr["dt"]).total_seconds() / 60))
+                # herda a atribuição do front, a não ser que a UTM da própria compra seja MAIS precisa
+                if rank(fa) >= rank(a):
+                    a = fa
+                    via = "comprador"
+            elif not a["in_dtl"]:
+                continue   # não é do funil DTL (nem comprador do front, nem UTM de campanha DTL)
+        if a["src"] == "meta" and a["lvl"] != "ad" and (a["cid"] or a["ids"]):
+            ids_sem_nome += 1
+        lvl_count[a["lvl"] if a["src"] == "meta" else a["src"]] += 1
+        src_count[a["src"]] += 1
+        role_count[role] += 1
+        via_count[via] += 1
         sales.append({
             "d": b["dt"].strftime("%Y-%m-%d"),
             "h": b["dt"].hour,
             "pr": product_short(b["product"]),
-            "main": main,
+            "role": role,                       # front | up | down | ltv
+            "main": 1 if role == "front" else 0,
+            "via": via,                         # utm = UTM da própria compra · comprador = herdou do front
+            "lag": lag,                         # minutos desde a compra do front (só não-front vinculadas)
             "v": round(b["value"], 2),
-            "src": src,
-            "plat": plat,
-            "pos": pos,
+            "src": a["src"], "plat": a["plat"], "pos": a["pos"],
             # dimensões (nome canônico da aba de Queries quando casou)
-            "camp": camp if camp is not None else (cid_label if src == "meta" else None),
-            "adset": adset if adset is not None else ("(não identificado)" if src == "meta" else None),
-            "ad": ad if ad is not None else ("(não identificado)" if src == "meta" else None),
-            "lvl": lvl if src == "meta" else None,
-            "cid": cid,
-            "ids": " · ".join(num_ids) if num_ids else None,
+            "camp": a["camp"], "adset": a["adset"], "ad": a["ad"], "lvl": a["lvl"],
+            "cid": a["cid"], "ids": a["ids"],
             "rf": b.get("rf", 0),
             "nm": first_last_initial(b["name"]),
             "em": mask_email(b["email"]),
@@ -706,6 +758,9 @@ def process(vendas_rows, meta_rows):
             "rastreio": dict(lvl_count),
             "origens": dict(src_count),
             "ids_sem_nome": ids_sem_nome,
+            "papeis": dict(role_count),
+            "vinculo": dict(via_count),
+            "roles": ROLE_LABELS,
         },
         "sales": sales,
         "meta": meta,
@@ -784,14 +839,14 @@ def main():
     b = data["build"]
     S = data["sales"]
     ok = [s for s in S if not s["rf"]]
-    main_ = [s for s in ok if s["main"]]
     sp = sum(m["sp"] for m in data["meta"])
-    fat = sum(s["v"] for s in main_)
-    fat_b = sum(s["v"] for s in ok if not s["main"])
+    by = lambda r: [s for s in ok if s["role"] == r]
+    fmt = lambda r: f"{len(by(r))} (R$ {sum(s['v'] for s in by(r)):,.2f})"
     print("== build ok ==", file=sys.stderr)
     print(f"  periodo    : {b['date_min']} -> {b['date_max']} (hoje {b['today']})", file=sys.stderr)
-    print(f"  vendas     : {len(main_)} {MAIN_PRODUCT_SHORT} (R$ {fat:,.2f}) + "
-          f"{len(ok) - len(main_)} back-end DTL (R$ {fat_b:,.2f}) · {b['reembolsos']} reembolso(s)", file=sys.stderr)
+    print(f"  funil      : front {fmt('front')} · upsell {fmt('up')} · downsell {fmt('down')} · "
+          f"LTV {fmt('ltv')} · {b['reembolsos']} reembolso(s)", file=sys.stderr)
+    print(f"  vínculo    : {b['vinculo']} (comprador = herdou o anúncio da compra do front)", file=sys.stderr)
     print(f"  duplicadas : {b['duplicadas']} evento(s) APPROVED/COMPLETED repetidos removidos", file=sys.stderr)
     print(f"  descartes  : {b['descartes']}", file=sys.stderr)
     print(f"  origens    : {b['origens']}", file=sys.stderr)

@@ -22,10 +22,16 @@
 1. Status `APPROVED`/`COMPLETED` (reembolso/chargeback/cancelamento anula a compra mais recente do mesmo e-mail+produto);
 2. não é teste (produto “test postback”, e-mail @example/test/teste.com, nome “Teste…”);
 3. **dedupe:** a Hotmart grava a mesma compra 2× (APPROVED + COMPLETED, mesmo horário) → 1 compra = (e-mail, produto, dia);
-4. **produto principal** entra sempre (todas as origens); **outros produtos** (DNA Expert, Sala…) só entram
-   como **back-end** quando a UTM é de campanha DTL.
+4. **Funil por COMPRADOR** (`product_role`): **front** = Trader Lucrativo (R$ 297) · **upsell** = DNA Expert 6 meses
+   (R$ 697) · **downsell** = DNA Expert 3 meses (R$ 397) · **LTV** = qualquer outra compra posterior do comprador do
+   front (ex.: Sala Educacional ~R$ 1.490, em média ~11 dias depois).
+5. Upsell/downsell/LTV são **vinculados ao comprador do front** (mesmo e-mail; compra do front mais recente até
+   10 min depois — `LINK_TOLERANCE_MIN`) e **herdam o anúncio do front** (`via='comprador'`), a não ser que a UTM
+   da própria compra seja mais precisa. Sem compra de front antes: só entra se a UTM for de campanha DTL (`via='utm'`).
 
-Métricas: `vendas`/`fat` = produto principal (CPA, ROAS, Ticket); `vb`/`fb` = back-end (ROAS total, Resultado).
+Métricas (`derive` em `app.js`): `vendas` = compradores do front (CPA) · **Faturamento do funil** = front + upsell +
+downsell → **ROAS funil** (principal) e **AOV** (= CPA de equilíbrio) · ROAS só do front · take rate do upsell
+(upsells ÷ fronts) e do downsell (downsells ÷ quem recusou o upsell) · **LTV** fica FORA do ROAS do funil (ROAS c/ LTV à parte).
 
 ## UTM × Meta (cruzamento)
 
@@ -45,7 +51,9 @@ Venda paga sem anúncio identificado → rateada entre os anúncios ativos **no 
 conhecida) pela proporção de **checkouts iniciados** (fallback: views → cliques → gasto). Vira “Vendas est.”,
 sempre rotulada como estimativa. A **decisão** (Escalar/Manter/Observar/Cortar) usa as vendas estimadas:
 CPA ≤ meta → Escalar · até +30% → Manter · acima → Cortar · sem amostra (gasto < `SAMPLE_MIN_SPEND` e vendas <
-volume mín.) → Observar · gastou o teto (meta×1,3) sem atingir o volume → Cortar. Meta CPA padrão = R$ 297 (ticket).
+volume mín.) → Observar · gastou o teto (meta×1,3) sem atingir o volume → Cortar. **Meta CPA padrão = CPA de
+equilíbrio do funil** (`EQ_CPA` = faturamento front+upsell+downsell ÷ compradores do front, todo o histórico); o
+gestor pode fixar outra no painel (ou `META_CPA` no build).
 
 ## Arquitetura
 

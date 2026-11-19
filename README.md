@@ -12,10 +12,14 @@ Somente leitura das planilhas. O build **nunca** escreve de volta.
 
 ## Abas
 
-1. **Visão Geral** — funil `Gasto → Impressões → Cliques → Views da página → Checkouts → Vendas → Faturamento`
-   (CPM, Frequência, CTR, CPC, Connect Rate, Conv. página, Custo/checkout, CPA, Conv. checkout, ROAS, Ticket),
-   evolução diária, tabela diária com heatmap, 8 KPIs (vendas/dia, ticket, ROAS total c/ back-end,
-   resultado, % via Meta, top anúncio, melhor dia, IG:FB) e distribuições (origem, produto, plataforma, posicionamento).
+1. **Visão Geral** — funil `Gasto → Impressões → Cliques → Views da página → Checkouts → Front (R$ 297) → Upsell · Downsell → Faturamento do funil`
+   (CPM, Frequência, CTR, CPC, Connect Rate, Conv. página, Custo/checkout, CPA, Conv. checkout, take rates, ROAS funil, AOV),
+   evolução diária, tabela diária com heatmap, 12 KPIs (vendas/dia, AOV = CPA de equilíbrio, take rate upsell/downsell,
+   ROAS só do front, resultado do funil, LTV posterior + dias até o LTV, % via Meta, top anúncio, melhor dia, IG:FB)
+   e distribuições (origem, produto/papel, plataforma, posicionamento).
+
+   **Funil por comprador:** upsell (DNA Expert 6m) e downsell (DNA Expert 3m) herdam o anúncio que trouxe o comprador
+   do front; compras posteriores (Sala Educacional) entram como **LTV**, fora do ROAS do funil.
 2. **Meta Ads** — só vendas com UTM de Meta; combinação diária; indicadores por dia (CPM/CTR · Connect/Conv. página ·
    CPA/ROAS); vendas por anúncio; donut checkout→venda; compilado por menor CPA; 3 tabelas hierárquicas
    Campanha → Conjunto → Anúncio com filtro cruzado e gráfico de CPA por dia; lista de vendas (mascarada).
