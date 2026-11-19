@@ -29,9 +29,17 @@
    10 min depois — `LINK_TOLERANCE_MIN`) e **herdam o anúncio do front** (`via='comprador'`), a não ser que a UTM
    da própria compra seja mais precisa. Sem compra de front antes: só entra se a UTM for de campanha DTL (`via='utm'`).
 
-Métricas (`derive` em `app.js`): `vendas` = compradores do front (CPA) · **Faturamento do funil** = front + upsell +
-downsell → **ROAS funil** (principal) e **AOV** (= CPA de equilíbrio) · ROAS só do front · take rate do upsell
-(upsells ÷ fronts) e do downsell (downsells ÷ quem recusou o upsell) · **LTV** fica FORA do ROAS do funil (ROAS c/ LTV à parte).
+Métricas (`derive` em `app.js`): `vendas` = compradores do front (CPA) · **Back** = upsell + downsell + Sala
+(tudo que o comprador do front compra depois) · **ROAS front** (só o produto de R$ 297) · **ROAS back** · **ROAS total**
+(front + back) — estas três colunas aparecem no funil, na tabela diária, nas tabelas Campanha/Conjunto/Anúncio e nas
+tabelas de decisão (versão "est." com o rateio do gap). AOV (front+upsell+downsell por comprador) = CPA de equilíbrio ·
+take rate do upsell (upsells ÷ fronts) e do downsell (downsells ÷ quem recusou o upsell).
+
+**Sala Educacional = evento de TODA TERÇA** (~R$ 1.490, pico às 21h). Entra no back na **data do front do comprador**
+(coorte: `d` = data do front, `dp` = data real da compra), então o ROAS back/total de um período inclui a Sala que os
+compradores daquele período compraram, mesmo numa terça seguinte (turmas recentes ainda maturam). Seção
+"Sala Educacional · evento de terça" na Visão Geral: turma = compradores do front de qua→ter; conversão da turma;
+vendas da Sala na semana do evento (ter→seg). `b` = id anônimo do comprador (inteiro sequencial, sem relação com o e-mail).
 
 ## UTM × Meta (cruzamento)
 
@@ -52,8 +60,8 @@ conhecida) pela proporção de **checkouts iniciados** (fallback: views → cliq
 sempre rotulada como estimativa. A **decisão** (Escalar/Manter/Observar/Cortar) usa as vendas estimadas:
 CPA ≤ meta → Escalar · até +30% → Manter · acima → Cortar · sem amostra (gasto < `SAMPLE_MIN_SPEND` e vendas <
 volume mín.) → Observar · gastou o teto (meta×1,3) sem atingir o volume → Cortar. **Meta CPA padrão = CPA de
-equilíbrio do funil** (`EQ_CPA` = faturamento front+upsell+downsell ÷ compradores do front, todo o histórico); o
-gestor pode fixar outra no painel (ou `META_CPA` no build).
+equilíbrio** (`EQ_CPA` = faturamento front+upsell+downsell ÷ compradores do front, todo o histórico — sem a Sala, que
+ainda matura); o gestor pode fixar outra no painel (ou `META_CPA` no build). A Meta ROAS do painel compara com o ROAS total.
 
 ## Arquitetura
 

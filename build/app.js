@@ -80,19 +80,23 @@ function derive(a){
   return {gasto:g, impr:a.im, clicks:a.cl, lpv:a.lpv, ic:a.ic, reach:a.rc,
     vendas:a.vd, fatFront:a.ft, fat:fF, fatL:fL, vu:a.vu, vdn:a.vdn, fud:a.fu+a.fdn, fl:a.fl,
     aov:a.vd?fF/a.vd:null, takeUp:a.vd?a.vu/a.vd:null, takeDown:(a.vd-a.vu)>0?a.vdn/(a.vd-a.vu):null,
+    /* BACK = tudo que o comprador do front compra depois: upsell + downsell + Sala/LTV */
+    fatBack:a.fu+a.fdn+a.fl, fatTotal:fL,
+    roasBack:a.sp>0?(a.fu+a.fdn+a.fl)/g:null, roasTotal:a.sp>0?fL/g:null,
     cpm:a.im?g/a.im*1000:null, freq:a.rc?a.im/a.rc:null,
     ctr:a.im?a.cl/a.im:null, cpc:a.cl?g/a.cl:null,
     connect:a.cl?a.lpv/a.cl:null, cplpv:a.lpv?g/a.lpv:null,
     convPg:a.lpv?a.ic/a.lpv:null, cpic:a.ic?g/a.ic:null,
     convCk:a.ic?a.vd/a.ic:null,
     cpa:(a.vd&&a.sp>0)?g/a.vd:null, ticket:a.vd?a.ft/a.vd:null,
-    roas:a.sp>0?fF/g:null, roasFront:a.sp>0?a.ft/g:null, roasL:a.sp>0?fL/g:null, res:fF-g, resL:fL-g};
+    roas:a.sp>0?fF/g:null, roasFront:a.sp>0?a.ft/g:null, roasL:a.sp>0?fL/g:null, res:fF-g, resL:fL-g, resT:fL-g};
 }
 function deriveE(a){
   const d=derive(a), g=d.gasto;
   d.ve=a.ve; d.fe=a.fe; d.fue=a.fue; d.fle=a.fle; d.fatE=a.fe+a.fue;
   d.cpaE=(a.ve>=0.05&&a.sp>0)?g/a.ve:null;
   d.roasE=a.sp>0?(a.fe+a.fue)/g:null; d.roasLE=a.sp>0?(a.fe+a.fue+a.fle)/g:null;
+  d.roasFE=a.sp>0?a.fe/g:null; d.roasBE=a.sp>0?(a.fue+a.fle)/g:null; d.roasTE=d.roasLE; d.fatTE=a.fe+a.fue+a.fle;
   d.convCkE=a.ic?a.ve/a.ic:null;
   return d;
 }
@@ -344,8 +348,8 @@ function funnelSteps(t){
     ['Views da página', intf(t.lpv), [['Connect',pct(dv.connect)],['Custo/view',brl(dv.cplpv)]]],
     ['Checkouts iniciados', intf(t.ic), [['Conv. página',pct(dv.convPg)],['Custo/checkout',brl(dv.cpic)]]],
     ['Vendas front · '+MAIN_SHORT, intf(t.vd), [['CPA',brl(dv.cpa)],['Conv. checkout',pct(dv.convCk)]], false, 'hl-lead'],
-    ['Upsell · Downsell', intf(t.vu)+' · '+intf(t.vdn), [['Take upsell',pct(dv.takeUp)],['Take downsell',pct(dv.takeDown)]]],
-    ['Faturamento do funil', brl(dv.fat), [['ROAS funil',roasf(dv.roas)],['Ticket (AOV)',brl(dv.aov)]], false, 'hl-fat', dv.fat],
+    ['Back (up · down · Sala)', brl(dv.fatBack), [['ROAS back',roasf(dv.roasBack)],['Up·Down·Sala',intf(t.vu)+'·'+intf(t.vdn)+'·'+intf(t.vl)]], false, '', dv.fatBack],
+    ['Faturamento total', brl(dv.fatTotal), [['ROAS front',roasf(dv.roasFront)],['ROAS total',roasf(dv.roasTotal)]], false, 'hl-fat', dv.fatTotal],
   ];
 }
 
@@ -366,7 +370,7 @@ function comboChart(id, d){
     data:{labels, datasets:[
       {type:'bar',label:'Vendas front',data:d.map(x=>x.vd),backgroundColor:cV,yAxisID:'y',borderRadius:3,order:4},
       {type:'line',label:'Gasto',data:d.map(x=>+(x.sp*taxf()).toFixed(2)),borderColor:cG,backgroundColor:cG,yAxisID:'y1',borderWidth:2,pointRadius:2,tension:.25,order:2},
-      {type:'line',label:'Faturamento do funil',data:d.map(x=>+(x.ft+x.fu+x.fdn).toFixed(2)),borderColor:cF,backgroundColor:cF,yAxisID:'y1',borderWidth:2,pointRadius:2,tension:.25,order:1},
+      {type:'line',label:'Faturamento total',data:d.map(x=>+(x.ft+x.fu+x.fdn+x.fl).toFixed(2)),borderColor:cF,backgroundColor:cF,yAxisID:'y1',borderWidth:2,pointRadius:2,tension:.25,order:1},
       {type:'line',label:'CPA',data:d.map(cpaOf),borderColor:cC,backgroundColor:cC,yAxisID:'y1',borderWidth:2,pointRadius:2,spanGaps:true,tension:.25,borderDash:[5,4],order:0},
     ]},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
@@ -427,7 +431,7 @@ function renderIndicadores(d){
     {label:'Conv. página (checkouts/views)',fn:x=>dd(x).convPg,type:'pct',axis:'y1',color:pal[1]}]);
   indChart('mIndCpa', d, [
     {label:'CPA',fn:x=>dd(x).cpa,type:'brl',axis:'y',color:cvar('--chart-cpa')||pal[4]},
-    {label:'ROAS funil',fn:x=>dd(x).roas,type:'x',axis:'y1',color:cvar('--chart-fat')||pal[1]}]);
+    {label:'ROAS total',fn:x=>dd(x).roasTotal,type:'x',axis:'y1',color:cvar('--chart-fat')||pal[1]}]);
 }
 /* Donut: checkouts iniciados (Meta) que viraram venda (Hotmart) */
 function donutConv(id, vendas, ic){
@@ -491,7 +495,7 @@ const SRC_LABEL={meta:'Meta Ads (pago)',organico:'Orgânico',hotmart:'Hotmart (v
 const countBy=(arr,fn)=>{ const m={}; arr.forEach(x=>{ const k=fn(x); if(k==null) return; m[k]=(m[k]||0)+1; }); return Object.entries(m).map(([label,n])=>({label,n})); };
 
 /* ---------------- PAGE 1: Visão Geral (e espelho no Insights de IA) ---------------- */
-const GERAL_IDS={funnel:'geralFunnel',kpis2:'geralKpis2',combo:'gCombo',orig:'gOrig',prod:'gProd',plat:'gPlat',pos:'gPos',daily:'gDaily'};
+const GERAL_IDS={sala:'gSala',salaChart:'gSalaChart',salaPill:'salaPill',funnel:'geralFunnel',kpis2:'geralKpis2',combo:'gCombo',orig:'gOrig',prod:'gProd',plat:'gPlat',pos:'gPos',daily:'gDaily'};
 const REL_IDS  ={funnel:'relFunnel', kpis2:'relKpis2', combo:'rCombo',orig:'rOrig',prod:'rProd',plat:'rPlat',pos:'rPos',daily:'rDaily'};
 function renderGeral(){ renderGeralCore(GERAL_IDS); }
 function renderGeralCore(ids){
@@ -505,8 +509,8 @@ function renderGeralCore(ids){
   const comCpa=dd.filter(x=>x.vd>0&&x.sp>0).map(x=>({d:x.d,v:(x.sp*taxf())/x.vd}));
   const melhorDia=comCpa.length?comCpa.reduce((a,b)=>b.v<a.v?b:a):null;
   const main=fS.filter(s=>s.role==='front'), nMeta=main.filter(s=>s.src==='meta').length;
-  const lags=fS.filter(s=>s.role==='ltv'&&s.lag!=null).map(s=>s.lag/1440).sort((a,b)=>a-b);
-  const lagMed=lags.length?lags[Math.floor(lags.length/2)]:null;
+  const frontBuyers=new Set(fS.filter(s=>s.role==='front').map(s=>s.b));
+  const salaBuyers=new Set(fS.filter(s=>s.role==='ltv'&&s.via==='comprador').map(s=>s.b));
   const nOrg=main.filter(s=>s.src==='organico'||s.src==='hotmart').length, nSem=main.filter(s=>s.src==='sem_utm').length;
   const nIg=mS.filter(s=>s.plat==='Instagram').length, nFb=mS.filter(s=>s.plat==='Facebook').length;
   const nRf=REFUNDS.filter(s=>dateActive(s.d)).length;
@@ -515,10 +519,10 @@ function renderGeralCore(ids){
     {label:'Ticket médio do funil (AOV)',val:brl(dv.aov),aux:'= CPA de equilíbrio (ROAS 1,0)'},
     {label:'Take rate do upsell',val:pct(dv.takeUp),aux:intf(t.vu)+' de '+intf(t.vd)+' compradores · '+brl(t.fu)},
     {label:'Take rate do downsell',val:pct(dv.takeDown),aux:intf(t.vdn)+' de '+intf(Math.max(0,t.vd-t.vu))+' que recusaram · '+brl(t.fdn)},
-    {label:'ROAS só do front',val:roasf(dv.roasFront),aux:'produto de '+brl(dv.ticket)+' sem upsell/downsell'},
-    {label:'Resultado do funil',val:brl(dv.res),aux:'Fat. funil − gasto'+(dv.fat?' · margem '+pct(dv.res/dv.fat):'')},
-    {label:'LTV posterior (Sala etc.)',val:brl(t.fl),aux:intf(t.vl)+' compra(s) · ROAS c/ LTV '+roasf(dv.roasL)},
-    {label:'Dias até o LTV (mediana)',val:lagMed==null?'-':numf(lagMed),aux:'da compra do front até a próxima compra'},
+    {label:'ROAS do back',val:roasf(dv.roasBack),aux:'upsell '+brl(t.fu)+' · downsell '+brl(t.fdn)+' · Sala '+brl(t.fl)},
+    {label:'Resultado total',val:brl(dv.resT),aux:'Fat. total − gasto'+(dv.fatTotal?' · margem '+pct(dv.resT/dv.fatTotal):'')},
+    {label:'Sala (LTV) dos compradores',val:brl(t.fl),aux:intf(t.vl)+' compra(s) · ROAS só front '+roasf(dv.roasFront)},
+    {label:'Conversão na Sala (LTV)',val:pct(frontBuyers.size?salaBuyers.size/frontBuyers.size:null),aux:intf(salaBuyers.size)+' de '+intf(frontBuyers.size)+' compradores · LTV/comprador '+brl(frontBuyers.size?t.fl/frontBuyers.size:null)},
     {label:'% vendas via Meta (UTM)',val:pct(t.vd?nMeta/t.vd:null),aux:intf(nOrg)+' orgânico/Hotmart · '+intf(nSem)+' sem UTM'},
     {label:'Top anúncio (vendas)',val:topAd?intf(topAd.n):'-',aux:topAd?shortName(topAd.ad):'—'},
     {label:'Melhor dia (CPA)',val:melhorDia?brl(melhorDia.v):'-',aux:melhorDia?brdate(melhorDia.d)+' · '+weekday(melhorDia.d):'—'},
@@ -526,6 +530,7 @@ function renderGeralCore(ids){
   ];
   document.getElementById(ids.kpis2).innerHTML=k2.map(kpiCard).join('');
   comboChart(ids.combo, dd);
+  if(ids.sala) renderSala(ids);
   hbar(ids.orig, countBy(fS,s=>SRC_LABEL[s.src]||s.src), x=>x.n, ()=>cvar('--chart-vendas'));
   hbar(ids.prod, countBy(fS,s=>(ROLE_LBL[s.role]||s.role)+' · '+s.pr), x=>x.n, x=>x.label.startsWith('Front')?cvar('--chart-vendas'):(x.label.startsWith('LTV')?cvar('--chart-est'):cvar('--chart-back')));
   hbar(ids.plat, countBy(mS,s=>s.plat), x=>x.n, ()=>cvar('--chart-vendas'));
@@ -541,14 +546,54 @@ function renderGeralCore(ids){
 const DAILY_COLS=[
   {key:'date',label:'Data',type:'date',w:84},{key:'wd',label:'Dia',type:'dim',w:46},
   {key:'gasto',label:'Gasto',type:'brl',heat:'gasto'},
-  {key:'ctr',label:'CTR',type:'pct'},
   {key:'ic',label:'Checkouts',type:'int'},
   {key:'vendas',label:'Vendas',type:'int',heat:'vendas'},{key:'cpa',label:'CPA',type:'brl'},
-  {key:'fat',label:'Fat. funil',type:'brl'},{key:'roas',label:'ROAS funil',type:'num2',heat:'roas'},
+  {key:'fat',label:'Fat. total',type:'brl'},{key:'roasF',label:'ROAS front',type:'num2'},{key:'roas',label:'ROAS total',type:'num2',heat:'roas'},
 ];
 function dailyCells(x,d,isTotal){
   return {date:isTotal?null:x.d, wd:isTotal?'':weekday(x.d), gasto:d.gasto, cpm:d.cpm, ctr:d.ctr, connect:d.connect,
-    ic:d.ic, vendas:d.vendas, cpa:d.cpa, fat:d.fat, roas:d.roas};
+    ic:d.ic, vendas:d.vendas, cpa:d.cpa, fat:d.fatTotal, roasF:d.roasFront, roas:d.roasTotal};
+}
+
+/* ---------------- Sala Educacional · evento de terça (LTV) ----------------
+   Turma da terça T = compradores do front com 1ª compra de qua (T−6) a ter (T).
+   Conversão da turma = quantos desses compradores já compraram a Sala (LTV vinculado pelo comprador), até hoje.
+   Semana do evento T = vendas da Sala com data real de compra de ter (T) a seg (T+6). */
+const tueOnOrAfter=d=>{ const dt=new Date(d+'T00:00:00'); dt.setDate(dt.getDate()+((2-dt.getDay()+7)%7)); return dstr(dt); };
+const tueOnOrBefore=d=>{ const dt=new Date(d+'T00:00:00'); dt.setDate(dt.getDate()-((dt.getDay()-2+7)%7)); return dstr(dt); };
+function renderSala(ids){
+  const firstFront={};
+  SALES.forEach(s=>{ if(s.role==='front'&&(!firstFront[s.b]||s.d<firstFront[s.b])) firstFront[s.b]=s.d; });
+  const W={}, g=T=>W[T]||(W[T]={T,novos:0,conv:new Set(),fatTurma:0,ev:0,fatEv:0});
+  Object.values(firstFront).forEach(d=>{ g(tueOnOrAfter(d)).novos++; });
+  SALES.forEach(s=>{ if(s.role!=='ltv') return;
+    if(s.via==='comprador'&&firstFront[s.b]){ const w=g(tueOnOrAfter(firstFront[s.b])); w.conv.add(s.b); w.fatTurma+=s.v; }
+    const e=g(tueOnOrBefore(s.dp||s.d)); e.ev++; e.fatEv+=s.v; });
+  const winActive=T=>{ for(let i=0;i<7;i++){ if(dateActive(addDays(T,-i))) return true; } return false; };
+  const rows=Object.values(W).filter(w=>winActive(w.T)&&(w.novos||w.ev)).sort((a,b)=>a.T<b.T?1:-1);
+  const st=T=>T>TODAY?'próxima terça':(T===TODAY?'hoje':'realizada');
+  renderTable({id:ids.sala, center:true,
+    cols:[{key:'T',label:'Terça',type:'date'},{key:'st',label:'Evento',type:'dim',w:96},
+      {key:'novos',label:'Turma (front)',type:'int'},{key:'nc',label:'Compraram Sala',type:'int',heat:'vendas'},
+      {key:'cv',label:'Conversão',type:'pct'},{key:'lpc',label:'LTV/comprador',type:'brl'},
+      {key:'ev',label:'Vendas na semana',type:'int'},{key:'fatEv',label:'Fat. na semana',type:'brl'}],
+    rows:rows.map(w=>({k:w.T,cells:{T:w.T,st:st(w.T),novos:w.novos,nc:w.conv.size,cv:w.novos?w.conv.size/w.novos:null,
+      lpc:w.novos?w.fatTurma/w.novos:null,ev:w.ev,fatEv:w.fatEv}})),
+    total:(()=>{ const n=rows.reduce((x,w)=>x+w.novos,0), c=rows.reduce((x,w)=>x+w.conv.size,0), f=rows.reduce((x,w)=>x+w.fatTurma,0);
+      return {T:null,st:'',novos:n,nc:c,cv:n?c/n:null,lpc:n?f/n:null,ev:rows.reduce((x,w)=>x+w.ev,0),fatEv:rows.reduce((x,w)=>x+w.fatEv,0)}; })()});
+  const pill=document.getElementById(ids.salaPill);
+  if(pill){ const n=rows.reduce((x,w)=>x+w.ev,0), f=rows.reduce((x,w)=>x+w.fatEv,0); pill.textContent=intf(n)+' vendas · '+brl(f); }
+  const id=ids.salaChart; destroy(id); const el=document.getElementById(id); if(!el) return;
+  const asc=rows.slice().reverse(), mut=cmuted();
+  charts[id]=new Chart(el,{data:{labels:asc.map(w=>brdate(w.T).slice(0,5)),datasets:[
+      {type:'bar',label:'Vendas da Sala (semana do evento)',data:asc.map(w=>w.ev),backgroundColor:cvar('--chart-est'),borderRadius:3,yAxisID:'y',order:2},
+      {type:'line',label:'Conversão da turma',data:asc.map(w=>w.novos?+(w.conv.size/w.novos*100).toFixed(2):null),borderColor:cvar('--chart-vendas'),backgroundColor:cvar('--chart-vendas'),borderWidth:2,pointRadius:3,tension:.25,spanGaps:true,yAxisID:'y1',order:0}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:cink(),boxWidth:10,usePointStyle:true,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y1'?c.dataset.label+': '+nf2.format(c.raw||0)+'%':c.dataset.label+': '+intf(c.raw)}}},
+      scales:{x:{ticks:{color:mut,font:{size:10}},grid:{display:false}},
+        y:{beginAtZero:true,ticks:{color:mut,precision:0,font:{size:10}},grid:{color:cgrid()},title:{display:true,text:'Vendas',color:mut,font:{size:10}}},
+        y1:{position:'right',beginAtZero:true,ticks:{color:mut,font:{size:10},callback:v=>v+'%'},grid:{display:false}}}}});
 }
 
 /* ---------------- PAGE 2: Meta Ads ---------------- */
@@ -577,11 +622,11 @@ function renderMeta(){
   donutConv('mConvDonut', t.vd, t.ic);
   const adAggM=buildAgg(fS,fM,'ad');
   const topRows=Object.entries(adAggM).filter(([k,a])=>k!==NI&&a.sp>0&&a.vd>0).map(([ad,a])=>{const d=derive(a);
-    return {k:ad, cells:{dim:ad,vendas:a.vd,cpa:d.cpa,roas:d.roas,gasto:d.gasto,ic:a.ic}, _o:d.cpa};})
+    return {k:ad, cells:{dim:ad,vendas:a.vd,cpa:d.cpa,roas:d.roasTotal,rb:d.roasBack,gasto:d.gasto,ic:a.ic}, _o:d.cpa};})
     .sort((a,b)=>a._o-b._o).slice(0,10);
   renderTable({id:'mTopCpa', center:true,
     cols:[{key:'dim',label:'Anúncios',type:'dim',big:true},{key:'vendas',label:'Vendas',type:'int'},
-      {key:'cpa',label:'CPA',type:'brl'},{key:'roas',label:'ROAS funil',type:'num2'},{key:'gasto',label:'Gasto',type:'brl'},
+      {key:'cpa',label:'CPA',type:'brl'},{key:'roas',label:'ROAS total',type:'num2'},{key:'rb',label:'ROAS back',type:'num2'},{key:'gasto',label:'Gasto',type:'brl'},
       {key:'ic',label:'Checkouts',type:'int'}],
     rows:topRows});
   const dl=dMeta.slice().reverse();
@@ -598,13 +643,15 @@ function renderMeta(){
     {key:'lpv',label:'Views pág.',type:'int'},{key:'connect',label:'Connect',type:'pct'},
     {key:'ic',label:'Checkouts',type:'int'},{key:'cpic',label:'Custo/IC',type:'brl'},
     {key:'vendas',label:'Vendas',type:'int'},{key:'cpa',label:'CPA',type:'brl'},
-    {key:'vu',label:'Upsells',type:'int'},{key:'vdn',label:'Downsells',type:'int'},
-    {key:'fat',label:'Fat. funil',type:'brl'},{key:'roas',label:'ROAS funil',type:'num2'},
-    {key:'fl',label:'LTV',type:'brl'},
+    {key:'ff',label:'Fat. front',type:'brl'},{key:'rf',label:'ROAS front',type:'num2'},
+    {key:'vu',label:'Upsells',type:'int'},{key:'vdn',label:'Downsells',type:'int'},{key:'vl',label:'Sala',type:'int'},
+    {key:'fb',label:'Fat. back',type:'brl'},{key:'rb',label:'ROAS back',type:'num2'},
+    {key:'rt',label:'ROAS total',type:'num2'},
   ];
   const hcells=(k,a)=>{const d=derive(a);
     return {dim:k,gasto:d.gasto,im:a.im,cpm:d.cpm,cl:a.cl,ctr:d.ctr,cpc:d.cpc,lpv:a.lpv,connect:d.connect,
-      ic:a.ic,cpic:d.cpic,vendas:a.vd,cpa:d.cpa,vu:a.vu,vdn:a.vdn,fat:d.fat,roas:d.roas,fl:a.fl};};
+      ic:a.ic,cpic:d.cpic,vendas:a.vd,cpa:d.cpa,ff:a.ft,rf:d.roasFront,vu:a.vu,vdn:a.vdn,vl:a.vl,
+      fb:d.fatBack,rb:d.roasBack,rt:d.roasTotal};};
   const hierRows=map=>Object.entries(map).map(([k,a])=>({k, cells:hcells(k,a)}));
   const Sc=metaScope('C'), Sa=metaScope('A'), Sd=metaScope('D');
   const aggC=buildAgg(Sc.fS,Sc.fM,'camp'), aggA=buildAgg(Sa.fS,Sa.fM,'adset'), aggD=buildAgg(Sd.fS,Sd.fM,'ad');
@@ -625,7 +672,7 @@ function renderMeta(){
       {key:'v',label:'Valor',type:'brl'},{key:'plat',label:'Plataforma',type:'dim'},{key:'pos',label:'Posicionamento',type:'dim'},
       {key:'lvl',label:'Rastreio',type:'html',w:110},{key:'via',label:'Atribuição',type:'dim',w:120},{key:'ad',label:'Anúncio',type:'dim'},
       {key:'camp',label:'Campanha',type:'dim',big:true},{key:'em',label:'E‑mail',type:'dim',w:200},{key:'ph',label:'Telefone',type:'dim',w:110}],
-    rows:q.map((s,i)=>({k:'s'+i, cells:{d:s.d,nm:s.nm,role:ROLE_LBL[s.role]||s.role,pr:s.pr,v:s.v,plat:s.plat,pos:s.pos||'—',lvl:lvlChip(s.lvl),via:s.via==='comprador'?'via comprador':'UTM própria',ad:s.ad,camp:s.camp,em:s.em,ph:s.ph}}))});
+    rows:q.map((s,i)=>({k:'s'+i, cells:{d:s.dp||s.d,nm:s.nm,role:ROLE_LBL[s.role]||s.role,pr:s.pr,v:s.v,plat:s.plat,pos:s.pos||'—',lvl:lvlChip(s.lvl),via:s.via==='comprador'?'via comprador':'UTM própria',ad:s.ad,camp:s.camp,em:s.em,ph:s.ph}}))});
 }
 
 /* ---------------- Metas & parâmetros (compartilhadas: Otimização + Insights) ---------------- */
@@ -672,7 +719,7 @@ function decision(a){
   }
   if(METAS.roas!=null&&METAS.roas>0){
     if(vol<METAS.volMin) return 'observar';
-    const r=d.roasE; return r>=METAS.roas?'escalar':(r>=METAS.roas/1.3?'manter':'cortar');
+    const r=d.roasTE; return r>=METAS.roas?'escalar':(r>=METAS.roas/1.3?'manter':'cortar');
   }
   return vol<METAS.volMin?'observar':'manter';
 }
@@ -733,21 +780,22 @@ const AD_COLS=[
   {key:'cpc',label:'CPC',type:'brl'},{key:'connect',label:'Connect',type:'pct'},
   {key:'ic',label:'Checkouts',type:'int'},{key:'cpic',label:'Custo/IC',type:'brl'},
   {key:'vd',label:'Vendas UTM',type:'int'},{key:'ve',label:'Vendas est.',type:'num',cls:()=> 'est'},
-  {key:'cpaE',label:'CPA est.',type:'brl'},{key:'roasE',label:'ROAS funil est.',type:'num2'},
-  {key:'fue',label:'Ups/Down est.',type:'brl'},{key:'dsv',label:'Dias s/ venda',type:'int'},
+  {key:'cpaE',label:'CPA est.',type:'brl'},
+  {key:'roasFE',label:'ROAS front est.',type:'num2'},{key:'roasBE',label:'ROAS back est.',type:'num2'},{key:'roasTE',label:'ROAS total est.',type:'num2'},
+  {key:'dsv',label:'Dias s/ venda',type:'int'},
 ];
 function renderAdDecisionTable(id,list){
   const rows=list.map(it=>{ const a=it.a, d=deriveE(a);
-    return {k:it.k, _state:it.dec, _cpa:d.cpaE, _roas:d.roasE, cells:{ad:a.ad,status:'',camp:campShort(a.camp),adset:a.adset,
+    return {k:it.k, _state:it.dec, _cpa:d.cpaE, _roas:d.roasTE, cells:{ad:a.ad,status:'',camp:campShort(a.camp),adset:a.adset,
       gasto:d.gasto,cpm:d.cpm,ctr:d.ctr,cpc:d.cpc,connect:d.connect,ic:a.ic,cpic:d.cpic,
-      vd:a.vd,ve:a.ve,cpaE:d.cpaE,roasE:d.roasE,fue:a.fue,dsv:it.dsv}}; });
+      vd:a.vd,ve:a.ve,cpaE:d.cpaE,roasFE:d.roasFE,roasBE:d.roasBE,roasTE:d.roasTE,dsv:it.dsv}}; });
   renderTable({id, cols:AD_COLS, rows, center:true,
     afterRender:(table,sorted)=>{
       table.querySelectorAll('tbody tr').forEach((tr,i)=>{ const it=sorted[i]; if(!it) return; const tds=tr.querySelectorAll('td');
         AD_COLS.forEach((c,ci)=>{ const td=tds[ci]; if(!td) return;
           if(c.key==='status') td.innerHTML=statusChip(it._state);
           if(c.key==='cpaE'){ const mc=metaColorClass(it._cpa,METAS.cpa); if(mc) td.classList.add(mc); }
-          if(c.key==='roasE'){ const mc=roasColorClass(it._roas,METAS.roas); if(mc) td.classList.add(mc); }
+          if(c.key==='roasTE'){ const mc=roasColorClass(it._roas,METAS.roas); if(mc) td.classList.add(mc); }
           if(c.key==='dsv' && it.cells.dsv>=METAS.nDias) td.classList.add('mc-red');
         }); });
     }});
@@ -805,24 +853,24 @@ function renderOtm(){
   // decisão por campanha
   const campAgg=estAgg(fS,fM,fE,r=>r.camp);
   const campRows=Object.entries(campAgg).map(([c,a])=>{ const d=deriveE(a);
-    return {k:c,_state:a.sp>0?decision(a):'observar',_cpa:d.cpaE,_roas:d.roasE,cells:{camp:c,status:'',gasto:d.gasto,ctr:d.ctr,connect:d.connect,ic:a.ic,cpic:d.cpic,
-      vd:a.vd,ve:a.ve,cpaE:d.cpaE,fe:d.fatE,roasE:d.roasE,roasLE:d.roasLE}}; }).sort((x,y)=>y.cells.gasto-x.cells.gasto);
+    return {k:c,_state:a.sp>0?decision(a):'observar',_cpa:d.cpaE,_roas:d.roasTE,cells:{camp:c,status:'',gasto:d.gasto,ctr:d.ctr,connect:d.connect,ic:a.ic,cpic:d.cpic,
+      vd:a.vd,ve:a.ve,cpaE:d.cpaE,fe:d.fatTE,roasFE:d.roasFE,roasBE:d.roasBE,roasTE:d.roasTE}}; }).sort((x,y)=>y.cells.gasto-x.cells.gasto);
   const CC=[{key:'camp',label:'Campanha',type:'dim',big:true,stk:'l'},{key:'status',label:'Decisão',type:'dim',w:104},
     {key:'gasto',label:'Gasto',type:'brl'},{key:'ctr',label:'CTR',type:'pct'},{key:'connect',label:'Connect',type:'pct'},
     {key:'ic',label:'Checkouts',type:'int'},{key:'cpic',label:'Custo/IC',type:'brl'},
     {key:'vd',label:'Vendas UTM',type:'int'},{key:'ve',label:'Vendas est.',type:'num',cls:()=>'est'},
-    {key:'cpaE',label:'CPA est.',type:'brl'},{key:'fe',label:'Fat. funil est.',type:'brl'},
-    {key:'roasE',label:'ROAS funil est.',type:'num2'},{key:'roasLE',label:'ROAS c/ LTV est.',type:'num2'}];
+    {key:'cpaE',label:'CPA est.',type:'brl'},{key:'fe',label:'Fat. total est.',type:'brl'},
+    {key:'roasFE',label:'ROAS front est.',type:'num2'},{key:'roasBE',label:'ROAS back est.',type:'num2'},{key:'roasTE',label:'ROAS total est.',type:'num2'}];
   const tc=Object.assign(newAgg(),{}); Object.values(campAgg).forEach(a=>{ Object.keys(tc).forEach(k=>{ tc[k]+=a[k]||0; }); });
   const td=deriveE(tc);
   renderTable({id:'oCamp', cols:CC, rows:campRows, center:true,
-    total:{camp:null,status:'',gasto:td.gasto,ctr:td.ctr,connect:td.connect,ic:tc.ic,cpic:td.cpic,vd:tc.vd,ve:tc.ve,cpaE:td.cpaE,fe:td.fatE,roasE:td.roasE,roasLE:td.roasLE},
+    total:{camp:null,status:'',gasto:td.gasto,ctr:td.ctr,connect:td.connect,ic:tc.ic,cpic:td.cpic,vd:tc.vd,ve:tc.ve,cpaE:td.cpaE,fe:td.fatTE,roasFE:td.roasFE,roasBE:td.roasBE,roasTE:td.roasTE},
     selectable:true, selSet:STATE.oSelC, onSelect:(key,e)=>{ toggleSet(STATE.oSelC,key,e&&(e.ctrlKey||e.metaKey)); renderOtm(); },
     afterRender:(table,sorted)=>{ table.querySelectorAll('tbody tr').forEach((tr,i)=>{ const it=sorted[i]; if(!it) return; const tds=tr.querySelectorAll('td');
       CC.forEach((c,ci)=>{ const tdd=tds[ci]; if(!tdd) return;
         if(c.key==='status') tdd.innerHTML=statusChip(it._state);
         if(c.key==='cpaE'){ const mc=metaColorClass(it._cpa,METAS.cpa); if(mc) tdd.classList.add(mc); }
-        if(c.key==='roasE'){ const mc=roasColorClass(it._roas,METAS.roas); if(mc) tdd.classList.add(mc); } }); }); }});
+        if(c.key==='roasTE'){ const mc=roasColorClass(it._roas,METAS.roas); if(mc) tdd.classList.add(mc); } }); }); }});
   // decisão por anúncio
   let pool=adPool(fS,fM,fE);
   if(STATE.oSelC.size) pool=pool.filter(it=>STATE.oSelC.has(it.a.camp));
@@ -876,7 +924,7 @@ function renderAlerts(pool, t){
   const li=(it,txt)=>`<li><b>${escHtml(shortName(it.a.ad,40))}</b> <span style="color:var(--muted)">(${escHtml(shortName(it.a.adset,28))})</span> — ${txt}</li>`;
   const cards=[];
   const esc=pool.filter(it=>it.dec==='escalar').sort((x,y)=>y.a.ve-x.a.ve).slice(0,6);
-  cards.push({c:'a-green',h:'Escalar',p:'CPA estimado dentro da meta, com volume mínimo de vendas.',items:esc.map(it=>{const d=deriveE(it.a); return li(it,`${numf(it.a.ve)} vendas est. · CPA <b>${brl(d.cpaE)}</b> · ROAS funil ${roasf(d.roasE)}`);})});
+  cards.push({c:'a-green',h:'Escalar',p:'CPA estimado dentro da meta, com volume mínimo de vendas.',items:esc.map(it=>{const d=deriveE(it.a); return li(it,`${numf(it.a.ve)} vendas est. · CPA <b>${brl(d.cpaE)}</b> · ROAS total ${roasf(d.roasTE)} (back ${roasf(d.roasBE)})`);})});
   const cut=pool.filter(it=>it.dec==='cortar').sort((x,y)=>y.a.sp-x.a.sp).slice(0,6);
   cards.push({c:'a-red',h:'Cortar',p:'CPA acima do teto (meta +30%) ou já gastou o teto sem vender.',items:cut.map(it=>{const d=deriveE(it.a); return li(it,`gasto <b>${brl(d.gasto)}</b> · ${numf(it.a.ve)} vendas est. · CPA ${brl(d.cpaE)}`);})});
   const streak=pool.filter(it=>it.dsv>=METAS.nDias&&it.dec!=='cortar').sort((x,y)=>y.dsv-x.dsv).slice(0,6);

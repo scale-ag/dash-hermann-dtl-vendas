@@ -675,6 +675,7 @@ def process(vendas_rows, meta_rows):
         if product_role(b["product"]) == "front" and not b.get("rf"):
             fronts[who_of(b)].append(b)
 
+    buyer_ids: dict[str, int] = {}   # id ANÔNIMO do comprador (inteiro sequencial, sem relação com o e-mail)
     sales = []
     lvl_count = Counter()
     src_count = Counter()
@@ -686,6 +687,7 @@ def process(vendas_rows, meta_rows):
         a = attr[id(b)]
         via = "utm"
         lag = None
+        cohort_dt = None
         if role != "front":
             # vínculo pelo COMPRADOR: a compra do front mais recente até esta (tolerância de 10 min,
             # porque o upsell às vezes é gravado no mesmo minuto ou antes do front)
@@ -694,6 +696,7 @@ def process(vendas_rows, meta_rows):
                 fr = prev[-1]
                 fa = attr[id(fr)]
                 lag = max(0, round((b["dt"] - fr["dt"]).total_seconds() / 60))
+                cohort_dt = fr["dt"]
                 # herda a atribuição do front, a não ser que a UTM da própria compra seja MAIS precisa
                 if rank(fa) >= rank(a):
                     a = fa
@@ -706,8 +709,13 @@ def process(vendas_rows, meta_rows):
         src_count[a["src"]] += 1
         role_count[role] += 1
         via_count[via] += 1
+        # LTV (ex.: Sala Educacional, vendida no evento de TERÇA) entra na data do FRONT do comprador
+        # (coorte): o período "Este mês" mostra o LTV de quem ENTROU no mês, mesmo que compre numa terça seguinte.
+        d_attr = cohort_dt if (role == "ltv" and cohort_dt is not None) else b["dt"]
         sales.append({
-            "d": b["dt"].strftime("%Y-%m-%d"),
+            "d": d_attr.strftime("%Y-%m-%d"),
+            "dp": b["dt"].strftime("%Y-%m-%d"),   # data real da compra
+            "b": buyer_ids.setdefault(who_of(b), len(buyer_ids) + 1),
             "h": b["dt"].hour,
             "pr": product_short(b["product"]),
             "role": role,                       # front | up | down | ltv
