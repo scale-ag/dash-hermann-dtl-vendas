@@ -192,6 +192,24 @@
           <p class="note" data-metas-note></p>
         </div>
 
+        <h2 class="sec-title">Campanha → Conjunto → Anúncio <span class="pill q">vendas reais + rateio do gap</span> <span class="ot-selinfo" id="otmSelInfo"></span></h2>
+        <div class="card ot-card">
+          <div class="ot-head"><b>Campanhas</b><span>clique numa linha p/ filtrar conjuntos, anúncios e sinais · clique de novo p/ limpar · Ctrl = várias</span></div>
+          <div class="tbl-wrap ot-wrap"><table class="dt ot" id="oCampT"></table></div>
+        </div>
+        <div class="card ot-card">
+          <div class="ot-head"><b>Conjuntos</b><span>clique numa linha p/ filtrar os anúncios · clique de novo p/ limpar</span></div>
+          <div class="tbl-wrap ot-wrap"><table class="dt ot" id="oSetT"></table></div>
+        </div>
+        <div class="card ot-card">
+          <div class="ot-head"><b>Anúncios</b><span>cada linha = anúncio dentro do seu conjunto · clique p/ ver só os sinais dele</span></div>
+          <div class="tbl-wrap ot-wrap ot-tall"><table class="dt ot" id="oAdT"></table></div>
+        </div>
+        <p class="note"><b>Faturamento</b> = só o front (R$ 297). ROAS acumulado: <b>ROAS</b> (front) → <b>c/UP</b> (+ upsell DNA Expert 6m) → <b>c/UP+DOWN</b> (+ downsell DNA Expert 3m) → <b>c/SALA</b> (+ Sala de terça = total). Selo <span class="rp g">verde</span> ≥ meta ROAS (padrão 1,00 = empate, com imposto) · <span class="rp y">amarelo</span> ≥ 80% da meta · <span class="rp r">vermelho</span> abaixo · <span class="rp z">0,00</span> sem retorno. Vendas e faturamento = vendas da UTM + <b>rateio</b> das vendas sem anúncio identificado pelos checkouts do dia (estimativa). <b>Decisão</b> pelo CPA vs. meta do painel.</p>
+
+        <h2 class="sec-title">Sinais de otimização <span class="pill q" id="otmAlertCount"></span></h2>
+        <div class="otm-alerts" id="otmAlerts"></div>
+
         <h2 class="sec-title">Gap de dados · Gerenciador do Meta × vendas reais (Hotmart)</h2>
         <div class="kpis n2 k8" id="otmGapKpis"></div>
         <div class="grid otm-gap-grid" style="margin-top:16px">
@@ -199,21 +217,6 @@
           <div class="card" style="padding:0"><div style="padding:14px 15px 4px"><h3>Vendas pagas sem anúncio identificado</h3><p class="hint" style="margin:0">UTM antiga (só ID) ou campanha fora da aba de Queries · busque o ID no Gerenciador</p></div><div class="tbl-wrap" style="max-height:300px;padding:0 0 10px"><table class="dt" id="oIds"></table></div></div>
         </div>
         <p class="note" id="otmGapNote"></p>
-
-        <h2 class="sec-title">Sinais de otimização <span class="pill q" id="otmAlertCount"></span></h2>
-        <div class="otm-alerts" id="otmAlerts"></div>
-
-        <h2 class="sec-title">Decisão por campanha <span class="pill q">vendas reais + estimadas</span></h2>
-        <div class="card" style="padding:0">
-          <div class="tbl-wrap"><table class="dt rel-adt" id="oCamp"></table></div>
-          <p class="note" style="padding:10px 15px">Clique numa campanha para filtrar a tabela de anúncios abaixo (Ctrl = várias). <b>Vendas UTM</b> = casadas pela UTM · <b>Vendas est.</b> = UTM + rateio das vendas sem anúncio identificado (ver nota abaixo).</p>
-        </div>
-
-        <h2 class="sec-title">Decisão por anúncio <span class="pill q" id="otmAdCount"></span></h2>
-        <div class="card" style="padding:0">
-          <div class="tbl-wrap"><table class="dt rel-adt" id="oAds"></table></div>
-          <p class="note" style="padding:10px 15px" id="otmAdsNote"></p>
-        </div>
 
         <h2 class="sec-title">Vendas por posicionamento &amp; plataforma <span class="pill q">só UTM</span></h2>
         <div class="grid otm-pos-grid">

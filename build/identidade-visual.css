@@ -28,6 +28,9 @@
   --step-mql-bg:#EAF0FF; --step-mql-bd:#3B5BDB;
   --step-gasto-bg:#FDECEC; --step-gasto-bd:#E34948;
   --step-fat-bg:#E9F9EE; --step-fat-bd:#0CA30C;
+  /* selos de ROAS (aba Otimização) + linha selecionada */
+  --pill-red:#E5566B; --pill-red-ink:#FFFFFF; --pill-yellow:#F0BE4A; --pill-yellow-ink:#2B2100;
+  --pill-green:#1FBF8F; --pill-green-ink:#04271B; --pill-zero:#E7E9EF; --ot-sel-bg:#FFF6DA;
 }
 
 /* ------------------------------ TEMA ESCURO (toggle) ----------------------- */
@@ -67,4 +70,6 @@
   --step-mql-bg:#16233F; --step-mql-bd:#5B7BF0;
   --step-gasto-bg:#3A1D20; --step-gasto-bd:#EF4444;
   --step-fat-bg:#132B1D; --step-fat-bd:#22C55E;
+  --pill-red:#F0566E; --pill-red-ink:#FFFFFF; --pill-yellow:#F2C14E; --pill-yellow-ink:#231A00;
+  --pill-green:#22C99A; --pill-green-ink:#03241A; --pill-zero:#232833; --ot-sel-bg:#2A2716;
 }

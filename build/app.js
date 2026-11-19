@@ -23,6 +23,8 @@ const pct=v=>(v==null||!isFinite(v))?'-':nf2.format(v*100)+'%';
 const intf=v=>(v==null||!isFinite(v))?'-':nf0.format(v);
 const numf=v=>(v==null||!isFinite(v))?'-':nf1.format(v);
 const num2f=v=>(v==null||!isFinite(v))?'-':nf2.format(v);
+const brl0=v=>(v==null||!isFinite(v))?'-':'R$ '+nf0.format(v);
+const n1f=v=>(v==null||!isFinite(v))?'-':(Math.abs(v-Math.round(v))<0.05?nf0.format(Math.round(v)):nf1.format(v));
 const roasf=v=>(v==null||!isFinite(v))?'-':nf2.format(v)+'x';
 const dimf=v=>v==null?'-':String(v);
 const norm=s=>(s==null?'':String(s)).trim().toLowerCase();
@@ -45,8 +47,8 @@ const STATE = {
   page:'geral', from:(()=>{const [y,m]=TODAY.split('-'); return `${y}-${m}-01`;})(), to:TODAY, preset:'mes', tax:true,
   selDays:new Set(),
   mSelC:new Set(), mSelA:new Set(), mSelAd:new Set(),   // filtro cruzado (aba Meta Ads)
-  oSelC:new Set(),                                     // filtro de campanha (aba Otimização)
-  sort:{}, colw: lsGet(LS_COLW,{}),
+  oSelC:new Set(), oSelA:new Set(), oSelAd:new Set(), // filtro Campanha → Conjunto → Anúncio (aba Otimização)
+  sort:{oCampT:{key:'gasto',dir:'desc'},oSetT:{key:'gasto',dir:'desc'},oAdT:{key:'gasto',dir:'desc'}}, colw: lsGet(LS_COLW,{}),
 };
 const taxf = ()=> STATE.tax ? TAX : 1;
 
@@ -68,13 +70,14 @@ const metaActive  = ()=> META.filter(m=>dateActive(m.d));
    Estimado (aba Otimização): ve/fe = vendas/faturamento do principal após o rateio do gap,
             fue = upsell+downsell estimados (R$) · fle = LTV estimado (R$).
    Regra de ouro: acumulativas SOMAM; taxas RECALCULAM dos totais. CPA/ROAS só com gasto > 0. */
-const newAgg=()=>({sp:0,im:0,cl:0,lpv:0,ic:0,rc:0,vd:0,ft:0,vu:0,fu:0,vdn:0,fdn:0,vl:0,fl:0,ve:0,fe:0,fue:0,fle:0});
+const newAgg=()=>({sp:0,im:0,cl:0,lpv:0,ic:0,rc:0,vd:0,ft:0,vu:0,fu:0,vdn:0,fdn:0,vl:0,fl:0,ve:0,fe:0,fue:0,fup:0,fdo:0,fle:0});
 function addMeta(a,r){ a.sp+=r.sp; a.im+=r.im; a.cl+=r.cl; a.lpv+=r.lpv; a.ic+=r.ic; a.rc+=r.rc; }
 function addSale(a,s){
   if(s.role==='front'){ a.vd+=1; a.ft+=s.v; } else if(s.role==='up'){ a.vu+=1; a.fu+=s.v; }
   else if(s.role==='down'){ a.vdn+=1; a.fdn+=s.v; } else { a.vl+=1; a.fl+=s.v; } }
 function addEst(a,e){
-  if(e.role==='front'){ a.ve+=e.w; a.fe+=e.w*e.v; } else if(e.role==='ltv'){ a.fle+=e.w*e.v; } else { a.fue+=e.w*e.v; } }
+  if(e.role==='front'){ a.ve+=e.w; a.fe+=e.w*e.v; } else if(e.role==='ltv'){ a.fle+=e.w*e.v; }
+  else { a.fue+=e.w*e.v; if(e.role==='up') a.fup+=e.w*e.v; else a.fdo+=e.w*e.v; } }
 function derive(a){
   const g=a.sp*taxf(), fF=a.ft+a.fu+a.fdn, fL=fF+a.fl;
   return {gasto:g, impr:a.im, clicks:a.cl, lpv:a.lpv, ic:a.ic, reach:a.rc,
@@ -163,13 +166,16 @@ function textWidth(s, font){
   _measureCtx.font=font;
   return _measureCtx.measureText(s==null?'':String(s)).width;
 }
-const fmtStd=(t,v)=> t==='brl'?brl(v):t==='pct'?pct(v):t==='int'?intf(v):t==='num'?numf(v):t==='num2'?num2f(v):t==='date'?brdate(v):t==='html'?'':dimf(v);
+const fmtStd=(t,v)=> t==='brl'?brl(v):t==='brl0'?brl0(v):t==='n1'?n1f(v):t==='pct'?pct(v):t==='int'?intf(v):t==='num'?numf(v):t==='num2'?num2f(v):t==='date'?brdate(v):t==='html'?'':dimf(v);
 const FONT_DIM='500 12.5px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif';
 const FONT_NUM='12.5px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif';
 const FONT_HEAD='700 11px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif';
 function autoDimWidth(cfg,c){
   let max=textWidth(c.label||'',FONT_HEAD);
-  (cfg.rows||[]).forEach(r=>{ const w=textWidth(fmtStd(c.type,r.cells[c.key]),FONT_DIM); if(w>max) max=w; });
+  const fDim=cfg.dimFont||FONT_DIM;
+  (cfg.rows||[]).forEach(r=>{ const w=textWidth(fmtStd(c.type,r.cells[c.key]),fDim)+(cfg.dimPad||0); if(w>max) max=w;
+    // subtítulo (contexto) sob o nome — linha menor, também nunca corta
+    if(r.sub&&c===cfg.cols[0]){ const w2=textWidth(r.sub,'400 10.5px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif'); if(w2>max) max=w2; } });
   if(cfg.total && cfg.total[c.key]!=null){ const w=textWidth(fmtStd(c.type,cfg.total[c.key]),FONT_DIM); if(w>max) max=w; }
   return Math.max(140, Math.min(1000, Math.round(max)+46)); // + padding (10+10) + folga p/ seta de ordenação
 }
@@ -223,7 +229,7 @@ function renderTable(cfg){
   const ext={};
   cfg.cols.forEach(c=>{ if(c.heat){ const vs=rows.map(r=>r.cells[c.key]).filter(v=>v!=null&&isFinite(v)); ext[c.key]=[Math.min(...vs),Math.max(...vs)]; }});
   // métricas de custo sempre com "R$" (mesmo em tabelas densas/fit) — % nas de taxa, sem símbolo nas demais
-  const fmt=(t,v)=> t==='brl'?brl(v):t==='pct'?pct(v):t==='int'?intf(v):t==='num'?numf(v):t==='num2'?num2f(v):t==='date'?brdate(v):t==='html'?(v==null?'-':String(v)):dimf(v);
+  const fmt=(t,v)=> t==='brl'?brl(v):t==='brl0'?brl0(v):t==='n1'?n1f(v):t==='pct'?pct(v):t==='int'?intf(v):t==='num'?numf(v):t==='num2'?num2f(v):t==='date'?brdate(v):t==='html'?(v==null?'-':String(v)):dimf(v);
   const widths=fit?[]:cfg.cols.map(c=>colWidth(cfg,c)); const totalW=widths.reduce((a,b)=>a+b,0);
   // modo fit: dimensão/data com largura fixa; colunas numéricas dividem o resto por igual
   const fitW=c=> c.w?c.w+'px' : c.type==='date'?'74px' : c.type==='dim'?(c.big?'210px':'116px') : '';
@@ -850,36 +856,21 @@ function renderOtm(){
     +`A campanha da UTM antiga é resolvida pelo mapa ID → nome (${nMap} campanha${nMap===1?'':'s'} mapeada${nMap===1?'':'s'}). `
     +`As vendas sem anúncio identificado são <b>rateadas</b> entre os anúncios ativos no mesmo dia pela proporção de <b>checkouts iniciados</b> do Meta (estimativa, coluna “Vendas est.”). `
     +(B.meta_has_ids?'A aba de Queries já tem colunas de ID — o casamento por ID está ativo.':'<b>Para fechar o gap de vez:</b> adicione as colunas <b>Campaign ID, Ad Set ID e Ad ID</b> na query do Meta — o build detecta sozinho e casa as vendas antigas até o anúncio.');
-  // decisão por campanha
-  const campAgg=estAgg(fS,fM,fE,r=>r.camp);
-  const campRows=Object.entries(campAgg).map(([c,a])=>{ const d=deriveE(a);
-    return {k:c,_state:a.sp>0?decision(a):'observar',_cpa:d.cpaE,_roas:d.roasTE,cells:{camp:c,status:'',gasto:d.gasto,ctr:d.ctr,connect:d.connect,ic:a.ic,cpic:d.cpic,
-      vd:a.vd,ve:a.ve,cpaE:d.cpaE,fe:d.fatTE,roasFE:d.roasFE,roasBE:d.roasBE,roasTE:d.roasTE}}; }).sort((x,y)=>y.cells.gasto-x.cells.gasto);
-  const CC=[{key:'camp',label:'Campanha',type:'dim',big:true,stk:'l'},{key:'status',label:'Decisão',type:'dim',w:104},
-    {key:'gasto',label:'Gasto',type:'brl'},{key:'ctr',label:'CTR',type:'pct'},{key:'connect',label:'Connect',type:'pct'},
-    {key:'ic',label:'Checkouts',type:'int'},{key:'cpic',label:'Custo/IC',type:'brl'},
-    {key:'vd',label:'Vendas UTM',type:'int'},{key:'ve',label:'Vendas est.',type:'num',cls:()=>'est'},
-    {key:'cpaE',label:'CPA est.',type:'brl'},{key:'fe',label:'Fat. total est.',type:'brl'},
-    {key:'roasFE',label:'ROAS front est.',type:'num2'},{key:'roasBE',label:'ROAS back est.',type:'num2'},{key:'roasTE',label:'ROAS total est.',type:'num2'}];
-  const tc=Object.assign(newAgg(),{}); Object.values(campAgg).forEach(a=>{ Object.keys(tc).forEach(k=>{ tc[k]+=a[k]||0; }); });
-  const td=deriveE(tc);
-  renderTable({id:'oCamp', cols:CC, rows:campRows, center:true,
-    total:{camp:null,status:'',gasto:td.gasto,ctr:td.ctr,connect:td.connect,ic:tc.ic,cpic:td.cpic,vd:tc.vd,ve:tc.ve,cpaE:td.cpaE,fe:td.fatTE,roasFE:td.roasFE,roasBE:td.roasBE,roasTE:td.roasTE},
-    selectable:true, selSet:STATE.oSelC, onSelect:(key,e)=>{ toggleSet(STATE.oSelC,key,e&&(e.ctrlKey||e.metaKey)); renderOtm(); },
-    afterRender:(table,sorted)=>{ table.querySelectorAll('tbody tr').forEach((tr,i)=>{ const it=sorted[i]; if(!it) return; const tds=tr.querySelectorAll('td');
-      CC.forEach((c,ci)=>{ const tdd=tds[ci]; if(!tdd) return;
-        if(c.key==='status') tdd.innerHTML=statusChip(it._state);
-        if(c.key==='cpaE'){ const mc=metaColorClass(it._cpa,METAS.cpa); if(mc) tdd.classList.add(mc); }
-        if(c.key==='roasTE'){ const mc=roasColorClass(it._roas,METAS.roas); if(mc) tdd.classList.add(mc); } }); }); }});
-  // decisão por anúncio
-  let pool=adPool(fS,fM,fE);
-  if(STATE.oSelC.size) pool=pool.filter(it=>STATE.oSelC.has(it.a.camp));
-  pool.sort((x,y)=>(DEC_ORDER[x.dec]-DEC_ORDER[y.dec])||cmpBest(x,y));
-  renderAdDecisionTable('oAds',pool);
-  const cnt=pool.reduce((m,it)=>{ m[it.dec]=(m[it.dec]||0)+1; return m; },{});
-  document.getElementById('otmAdCount').textContent=pool.length+' anúncios com gasto'+(STATE.oSelC.size?' · filtrado':'')
-    +' · '+(cnt.escalar||0)+' escalar · '+(cnt.cortar||0)+' cortar';
-  document.getElementById('otmAdsNote').innerHTML='Cada linha é um anúncio <b>dentro do seu conjunto</b> (o mesmo criativo em conjuntos diferentes aparece separado). Ordem: Escalar → Manter → Cortar → Observar e, dentro de cada grupo, mais vendas estimadas. <b>Vendas est.</b> = vendas da UTM + rateio das vendas sem anúncio identificado (checkouts do dia). <b>Dias s/ venda</b> = dias seguidos, até o fim do período, gastando sem venda (vermelho ≥ N dias do painel).';
+  // tabelas Campanha → Conjunto → Anúncio (clique filtra o nível de baixo e os sinais)
+  const mS2=fS.filter(s=>s.src==='meta');
+  const setKey=r=>r.camp+SEP+r.adset;
+  const inC=r=>!STATE.oSelC.size||STATE.oSelC.has(r.camp);
+  const inCA=r=>inC(r)&&(!STATE.oSelA.size||STATE.oSelA.has(setKey(r)));
+  renderOtTable('oCampT', estAgg(mS2,fM,fE,r=>r.camp), k=>k, null, STATE.oSelC,
+    (k,e)=>{ toggleSet(STATE.oSelC,k,e&&(e.ctrlKey||e.metaKey)); STATE.oSelA.clear(); STATE.oSelAd.clear(); renderOtm(); });
+  renderOtTable('oSetT', estAgg(mS2.filter(inC),fM.filter(inC),fE.filter(inC),setKey), (k,a)=>a.adset, a=>campShort(a.camp), STATE.oSelA,
+    (k,e)=>{ toggleSet(STATE.oSelA,k,e&&(e.ctrlKey||e.metaKey)); STATE.oSelAd.clear(); renderOtm(); });
+  renderOtTable('oAdT', estAgg(mS2.filter(inCA),fM.filter(inCA),fE.filter(inCA),adKey), (k,a)=>a.ad, a=>campShort(a.camp)+'  ›  '+a.adset, STATE.oSelAd,
+    (k,e)=>{ toggleSet(STATE.oSelAd,k,e&&(e.ctrlKey||e.metaKey)); renderOtm(); });
+  const nSel=STATE.oSelC.size+STATE.oSelA.size+STATE.oSelAd.size;
+  document.getElementById('otmSelInfo').textContent=nSel?'filtro ativo · clique de novo na linha p/ limpar':'';
+  let pool=adPool(mS2.filter(inCA),fM.filter(inCA),fE.filter(inCA));
+  if(STATE.oSelAd.size) pool=pool.filter(it=>STATE.oSelAd.has(it.k));
   renderAlerts(pool, t);
   // posicionamento & plataforma
   const pos={}; mS.forEach(s=>{ const key=s.pos||'Sem posicionamento (UTM antiga)'; const x=pos[key]||(pos[key]={n:0,v:0,plat:s.plat}); x.n++; x.v+=s.v; });
@@ -891,6 +882,46 @@ function renderOtm(){
           ...Object.entries(plat).sort((a,b)=>b[1].n-a[1].n).map(([k,x])=>({k:'f'+k,cells:{k:'Plataforma · '+k,n:x.n,p:x.n/nm,v:x.v}}))],
     total:{k:null,n:mS.length,p:1,v:fatOf(mS)}});
   hourChart('oHour', mS);
+}
+/* ---------------- Otimização · tabela no layout "ROAS em selos" ----------------
+   Vendas/faturamento ESTIMADOS (UTM + rateio do gap). Faturamento = só o FRONT; ROAS acumulado:
+   ROAS (front) → c/UP (+upsell) → c/UP+DOWN (+downsell) → c/SALA (+Sala = total). Selo: verde ≥ meta ROAS
+   (padrão 1,0 = empate) · amarelo ≥ 80% da meta · vermelho abaixo · cinza = 0 · "—" = sem gasto. */
+const OT_COLS=[
+  {key:'dim',label:'',type:'dim',big:true,stk:'l'},
+  {key:'gasto',label:'Gasto',type:'brl0'},{key:'fat',label:'Faturamento',type:'brl0'},
+  {key:'r0',label:'ROAS',type:'num2',pill:1},{key:'r1',label:'ROAS c/UP',type:'num2',pill:1},
+  {key:'r2',label:'ROAS c/UP+DOWN',type:'num2',pill:1},{key:'r3',label:'ROAS c/SALA',type:'num2',pill:1},
+  {key:'vendas',label:'Vendas',type:'n1'},{key:'cpa',label:'CPA',type:'brl0'},{key:'dec',label:'Decisão',type:'dim',w:100},
+];
+const OT_LABEL={oCampT:'Campanha',oSetT:'Conjunto',oAdT:'Anúncio'};
+function otCells(name,a){ const g=a.sp*taxf(), r=v=>a.sp>0?v/g:null;
+  return {dim:name,gasto:g,fat:a.fe,r0:r(a.fe),r1:r(a.fe+a.fup),r2:r(a.fe+a.fup+a.fdo),r3:r(a.fe+a.fup+a.fdo+a.fle),
+    vendas:a.ve,cpa:(a.ve>=0.05&&a.sp>0)?g/a.ve:null,dec:''}; }
+function roasPill(v){
+  if(v==null||!isFinite(v)) return '<span class="rp-none">—</span>';
+  const tgt=(METAS.roas!=null&&METAS.roas>0)?METAS.roas:1;
+  const cls=v<=0.0001?'rp z':(v>=tgt?'rp g':(v>=tgt*0.8?'rp y':'rp r'));
+  return `<span class="${cls}">${nf2.format(v)}</span>`;
+}
+function renderOtTable(id, map, nameFn, ctxFn, selSet, onSelect){
+  const entries=Object.entries(map).filter(([k,a])=>a.sp>0||a.ve>0.01||a.fe>0||a.fle>0);
+  const rows=entries.map(([k,a])=>{ const ctx=ctxFn?ctxFn(a):''; return {k, cells:otCells(nameFn(k,a),a), _dec:a.sp>0?decision(a):null, _ctx:ctx, sub:ctx}; })
+    .sort((x,y)=>y.cells.gasto-x.cells.gasto);
+  const tot=newAgg(); entries.forEach(([k,a])=>{ Object.keys(tot).forEach(f=>{ tot[f]+=a[f]||0; }); });
+  const totCells=otCells(null,tot);
+  renderTable({id, rows, total:totCells, selectable:true, selSet, onSelect,
+    dimFont:'600 13px "Segoe UI",system-ui,-apple-system,Roboto,sans-serif', dimPad:18,   // negrito 13px + "● " da seleção
+    cols:OT_COLS.map((c,i)=>i===0?{...c,label:OT_LABEL[id]||''}:c),
+    afterRender:(table,sorted)=>{
+      const paint=(tds,cells,dec,ctx)=>OT_COLS.forEach((c,ci)=>{ const td=tds[ci]; if(!td) return;
+        if(c.pill) td.innerHTML=roasPill(cells[c.key]);
+        if(c.key==='dec') td.innerHTML=dec?statusChip(dec):'';
+        if(c.key==='dim'&&ctx) td.insertAdjacentHTML('beforeend',`<div class="ot-ctx">${escHtml(ctx)}</div>`);
+        if(c.key==='cpa'){ const mc=metaColorClass(cells.cpa,METAS.cpa); if(mc) td.classList.add('ot-'+mc); } });
+      table.querySelectorAll('tbody tr').forEach((tr,i)=>{ const it=sorted[i]; if(it) paint(tr.querySelectorAll('td'),it.cells,it._dec,it._ctx); });
+      const ft=table.querySelector('tfoot tr'); if(ft) paint(ft.querySelectorAll('td'),totCells,null,'');
+    }});
 }
 function gapChart(id, fS, fM){
   destroy(id); const el=document.getElementById(id); if(!el) return;
@@ -1092,7 +1123,7 @@ document.getElementById('ppCancel').addEventListener('click',ppClose);
 document.getElementById('periodPop').addEventListener('click',e=>e.stopPropagation());
 document.addEventListener('click',()=>{ if(ppIsOpen()) ppClose(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&ppIsOpen()) ppClose(); });
-document.getElementById('clearBtn').addEventListener('click',()=>{ STATE.mSelC.clear();STATE.mSelA.clear();STATE.mSelAd.clear();STATE.oSelC.clear();STATE.selDays.clear(); applyPreset('mes'); });
+document.getElementById('clearBtn').addEventListener('click',()=>{ STATE.mSelC.clear();STATE.mSelA.clear();STATE.mSelAd.clear();STATE.oSelC.clear();STATE.oSelA.clear();STATE.oSelAd.clear();STATE.selDays.clear(); applyPreset('mes'); });
 document.getElementById('refreshBtn').addEventListener('click',function(){ this.classList.add('loading'); location.href=location.pathname+'?t='+Date.now()+location.hash; });
 
 /* painel de Metas & parâmetros (Otimização + Insights, sincronizados) — edita ao vivo e salva em localStorage */

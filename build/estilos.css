@@ -433,3 +433,31 @@
   /* 8 KPIs secundários em 2 linhas de 4 (não sobra 1 card sozinho) */
   .kpis.n2.k8{grid-template-columns:repeat(4,minmax(0,1fr))}
   @media(max-width:900px){.kpis.n2.k8{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+  /* ---------- Otimização · tabelas "ROAS em selos" (Campanha → Conjunto → Anúncio) ---------- */
+  .ot-card{padding:0; margin-bottom:14px; overflow:hidden}
+  .ot-head{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 16px 10px}
+  .ot-head b{font-size:13px; text-transform:uppercase; letter-spacing:.06em}
+  .ot-head span{font-size:11.5px; color:var(--muted)}
+  .ot-selinfo{font-size:11px; color:var(--yellow); text-transform:none; letter-spacing:0; margin-left:6px}
+  .ot-wrap{max-height:420px}
+  .ot-tall{max-height:560px}
+  table.dt.ot th, table.dt.ot td{padding:9px 12px}
+  table.dt.ot td{font-size:13px}
+  table.dt.ot td.dim{font-weight:600}
+  table.dt.ot thead th.sorted-asc, table.dt.ot thead th.sorted-desc{color:var(--good)}
+  table.dt.ot tbody tr.sel, table.dt.ot tbody tr.sel .stk-l{background:var(--ot-sel-bg)}
+  table.dt.ot tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--yellow)}
+  table.dt.ot tbody tr.sel td.dim:first-child::before{content:"● "; color:var(--yellow)}
+  table.dt.ot td .ot-ctx{font-size:10.5px; font-weight:400; color:var(--muted); white-space:nowrap; line-height:1.3; margin-top:2px}
+  table.dt.ot td.ot-mc-green{color:var(--good); font-weight:700}
+  table.dt.ot td.ot-mc-yellow{color:var(--yellow); font-weight:700}
+  table.dt.ot td.ot-mc-red{color:var(--bad); font-weight:700}
+  /* selo de ROAS */
+  .rp{display:inline-block; min-width:48px; padding:2px 9px; border-radius:999px; font-weight:800; font-size:11.5px; line-height:1.5; text-align:center; font-variant-numeric:tabular-nums}
+  .rp.r{background:var(--pill-red); color:var(--pill-red-ink)}
+  .rp.y{background:var(--pill-yellow); color:var(--pill-yellow-ink)}
+  .rp.g{background:var(--pill-green); color:var(--pill-green-ink)}
+  .rp.z{background:var(--pill-zero); color:var(--muted)}
+  .rp-none{color:var(--muted)}
+  .note .rp{min-width:0; padding:0 7px; font-size:10.5px}

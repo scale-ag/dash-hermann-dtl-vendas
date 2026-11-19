@@ -54,6 +54,14 @@ O padrão da UTM mudou em **14/11/2026**:
   casa as vendas antigas por ID (testa `co` e `t` contra Ad ID e Ad Set ID).
 - Origem: `meta` (UTM paga/ID/Meta-Ads), `organico` (link_in_bio, organic_*), `hotmart` (HOTMART_*), `sem_utm`.
 
+### Aba Otimização — layout "ROAS em selos" (`renderOtTable` em `app.js`)
+Três tabelas empilhadas **Campanhas → Conjuntos → Anúncios** (ids `oCampT`/`oSetT`/`oAdT`), ordenadas por Gasto ▼.
+Colunas: Gasto · Faturamento (só front) · **ROAS** (front) · **ROAS c/UP** · **ROAS c/UP+DOWN** · **ROAS c/SALA** (total)
+· Vendas · CPA · Decisão. ROAS em selo: verde ≥ meta ROAS do painel (padrão 1,00 = empate) · amarelo ≥ 80% · vermelho
+abaixo · cinza = 0 · "—" sem gasto. Clique numa campanha filtra conjuntos/anúncios/sinais (`STATE.oSelC`), num conjunto
+filtra anúncios (`oSelA`, chave camp+conjunto), num anúncio filtra os sinais (`oSelAd`); clique de novo limpa, Ctrl = várias.
+Linha selecionada: fundo amarelado + "●". Valores = UTM + rateio do gap (estimado). Abaixo: Sinais · Gap de dados · Posicionamento.
+
 ### Rateio do gap (aba Otimização, `EST` em `app.js`)
 Venda paga sem anúncio identificado → rateada entre os anúncios ativos **no mesmo dia** (dentro da campanha, se
 conhecida) pela proporção de **checkouts iniciados** (fallback: views → cliques → gasto). Vira “Vendas est.”,
