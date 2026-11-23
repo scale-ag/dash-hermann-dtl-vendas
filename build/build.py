@@ -383,7 +383,9 @@ def classify_source(f: dict) -> str:
     if not blob:
         return "sem_utm"
     srcn, medn = norm(f["source"]), norm(f["medium"])
-    if (f["cid"] or "paid" in (srcn, medn) or srcn in _META_SOURCES or srcn.startswith("facebook-ads")
+    # "paid_metaads", "meta_ads", "fb_paid"...: token "paid" ou "metaads" na origem = tráfego pago do Meta
+    paid_tok = bool(re.search(r"(^|[_\-\s])paid([_\-\s]|$)", srcn)) or "metaads" in re.sub(r"[_\-\s]", "", srcn)
+    if (f["cid"] or "paid" in (srcn, medn) or paid_tok or srcn in _META_SOURCES or srcn.startswith("facebook-ads")
             or srcn.startswith("meta-ads") or "_paid_" in blob
             or norm(f["campaign"]).startswith(norm(MAIN_PRODUCT_PREFIX) + " |")):
         return "meta"

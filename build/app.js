@@ -2,7 +2,13 @@
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const B = DATA.build, META = DATA.meta;
 /* vendas válidas (já deduplicadas no build); reembolsadas ficam de fora das métricas */
-const SALES = DATA.sales.filter(s=>!s.rf), REFUNDS = DATA.sales.filter(s=>s.rf);
+/* A dash considera SÓ vendas com UTM do Trader Lucrativo (Meta Ads · campanhas DTL): src==='meta'.
+   Upsell/downsell/Sala entram quando o COMPRADOR veio de UTM do TL (herdam o anúncio do front).
+   Orgânico, link na bio, WhatsApp, Hotmart e sem UTM ficam FORA (OUTSIDE) — só aparecem como
+   contagem na KPI "Fora da dash" e na seção Gap de dados da Otimização. */
+const SALES_ALL = DATA.sales.filter(s=>!s.rf);
+const SALES = SALES_ALL.filter(s=>s.src==='meta'), OUTSIDE = SALES_ALL.filter(s=>s.src!=='meta');
+const REFUNDS = DATA.sales.filter(s=>s.rf&&s.src==='meta');
 const TAX = B.tax_factor || 1.0;   // imposto da mídia paga (Meta Ads) — toggle "Imposto Meta"
 const NI = '(não identificado)';
 const MAIN_SHORT = B.main_product_short || 'Produto principal';
@@ -514,10 +520,10 @@ function renderGeralCore(ids){
   let topAd=null; Object.entries(adAgg).forEach(([ad,a])=>{ if(a.vd>0&&(topAd==null||a.vd>topAd.n)) topAd={ad,n:a.vd}; });
   const comCpa=dd.filter(x=>x.vd>0&&x.sp>0).map(x=>({d:x.d,v:(x.sp*taxf())/x.vd}));
   const melhorDia=comCpa.length?comCpa.reduce((a,b)=>b.v<a.v?b:a):null;
-  const main=fS.filter(s=>s.role==='front'), nMeta=main.filter(s=>s.src==='meta').length;
+  const out=OUTSIDE.filter(s=>s.role==='front'&&dateActive(s.d));
   const frontBuyers=new Set(fS.filter(s=>s.role==='front').map(s=>s.b));
   const salaBuyers=new Set(fS.filter(s=>s.role==='ltv'&&s.via==='comprador').map(s=>s.b));
-  const nOrg=main.filter(s=>s.src==='organico'||s.src==='hotmart').length, nSem=main.filter(s=>s.src==='sem_utm').length;
+  const nOrg=out.filter(s=>s.src==='organico').length, nHot=out.filter(s=>s.src==='hotmart').length, nSem=out.filter(s=>s.src==='sem_utm').length;
   const nIg=mS.filter(s=>s.plat==='Instagram').length, nFb=mS.filter(s=>s.plat==='Facebook').length;
   const nRf=REFUNDS.filter(s=>dateActive(s.d)).length;
   const k2=[
@@ -529,7 +535,7 @@ function renderGeralCore(ids){
     {label:'Resultado total',val:brl(dv.resT),aux:'Fat. total − gasto'+(dv.fatTotal?' · margem '+pct(dv.resT/dv.fatTotal):'')},
     {label:'Sala (LTV) dos compradores',val:brl(t.fl),aux:intf(t.vl)+' compra(s) · ROAS só front '+roasf(dv.roasFront)},
     {label:'Conversão na Sala (LTV)',val:pct(frontBuyers.size?salaBuyers.size/frontBuyers.size:null),aux:intf(salaBuyers.size)+' de '+intf(frontBuyers.size)+' compradores · LTV/comprador '+brl(frontBuyers.size?t.fl/frontBuyers.size:null)},
-    {label:'% vendas via Meta (UTM)',val:pct(t.vd?nMeta/t.vd:null),aux:intf(nOrg)+' orgânico/Hotmart · '+intf(nSem)+' sem UTM'},
+    {label:'Fora da dash (sem UTM do TL)',val:intf(out.length),aux:intf(nOrg)+' orgânico · '+intf(nSem)+' sem UTM · '+intf(nHot)+' Hotmart — não entram'},
     {label:'Top anúncio (vendas)',val:topAd?intf(topAd.n):'-',aux:topAd?shortName(topAd.ad):'—'},
     {label:'Melhor dia (CPA)',val:melhorDia?brl(melhorDia.v):'-',aux:melhorDia?brdate(melhorDia.d)+' · '+weekday(melhorDia.d):'—'},
     {label:'Proporção IG:FB',val:nFb?numf(nIg/nFb)+':1':(nIg?'∞':'-'),aux:intf(nIg)+' Instagram · '+intf(nFb)+' Facebook'+(nRf?' · '+nRf+' reembolso(s)':'')},
@@ -537,7 +543,7 @@ function renderGeralCore(ids){
   document.getElementById(ids.kpis2).innerHTML=k2.map(kpiCard).join('');
   comboChart(ids.combo, dd);
   if(ids.sala) renderSala(ids);
-  hbar(ids.orig, countBy(fS,s=>SRC_LABEL[s.src]||s.src), x=>x.n, ()=>cvar('--chart-vendas'));
+  hbar(ids.orig, countBy(fS.filter(s=>s.role==='front'),s=>campShort(s.camp)), x=>x.n, ()=>cvar('--chart-vendas'), 10);
   hbar(ids.prod, countBy(fS,s=>(ROLE_LBL[s.role]||s.role)+' · '+s.pr), x=>x.n, x=>x.label.startsWith('Front')?cvar('--chart-vendas'):(x.label.startsWith('LTV')?cvar('--chart-est'):cvar('--chart-back')));
   hbar(ids.plat, countBy(mS,s=>s.plat), x=>x.n, ()=>cvar('--chart-vendas'));
   hbar(ids.pos, countBy(mS,s=>s.pos), x=>x.n, ()=>cvar('--chart-back'), 10);
@@ -821,13 +827,14 @@ function renderOtm(){
   periodHeader('otmPeriodName','otmPeriodRange');
   renderMetasNote();
   const fS=salesActive(), fM=metaActive(), fE=estActive();
+  const fAll=SALES_ALL.filter(s=>dateActive(s.d));   // gap: inclui as vendas fora da dash (orgânico/sem UTM)
   const t=totals(fS,fM), dv=derive(t);
-  const main=fS.filter(s=>s.role==='front'), mS=fS.filter(s=>s.src==='meta');
+  const main=fAll.filter(s=>s.role==='front'), mS=fS.filter(s=>s.src==='meta');
   const nMetaMain=main.filter(s=>s.src==='meta').length;
   const lv=l=>mS.filter(s=>l.includes(s.lvl));
   const sAd=lv(['ad']), sCamp=lv(['adset','camp']), sNone=lv(['none']);
   const fatOf=a=>a.reduce((x,s)=>x+s.v,0);
-  const nOut=fS.filter(s=>s.src!=='meta').length;
+  const nOut=fAll.filter(s=>s.src!=='meta').length;
   const back=fS.filter(s=>s.role==='up'||s.role==='down'), viaBuyer=back.filter(s=>s.via==='comprador').length;
   const k=[
     {label:'Vendas reais (Hotmart)',val:intf(main.length),aux:brl(fatOf(main))+' · '+MAIN_SHORT},
@@ -836,11 +843,11 @@ function renderOtm(){
     {label:'Rastreio até o anúncio',val:pct(mS.length?sAd.length/mS.length:null),aux:intf(sAd.length)+' de '+intf(mS.length)+' vendas pagas (UTM c/ nome)'},
     {label:'Rastreio só até a campanha',val:pct(mS.length?sCamp.length/mS.length:null),aux:intf(sCamp.length)+' vendas · UTM antiga (só ID)'},
     {label:'Sem campanha identificada',val:intf(sNone.length),aux:brl(fatOf(sNone))+' · ID fora do mapa'},
-    {label:'Orgânico + Hotmart + sem UTM',val:intf(nOut),aux:pct(fS.length?nOut/fS.length:null)+' de todas as vendas'},
+    {label:'Fora da dash (orgânico/sem UTM)',val:intf(nOut),aux:pct(fAll.length?nOut/fAll.length:null)+' das vendas · não entram nos números'},
     {label:'Upsell + downsell',val:intf(back.length),aux:brl(fatOf(back))+' · '+intf(viaBuyer)+' atribuídos pelo comprador do front'},
   ];
   document.getElementById('otmGapKpis').innerHTML=k.map(kpiCard).join('');
-  gapChart('oGapChart', fS, fM);
+  gapChart('oGapChart', fAll, fM);
   // vendas pagas sem anúncio identificado, por ID
   const g={};
   mS.filter(s=>s.lvl!=='ad').forEach(s=>{ const key=(s.camp||'')+SEP+(s.ids||'—');

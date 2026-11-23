@@ -29,6 +29,13 @@
    10 min depois — `LINK_TOLERANCE_MIN`) e **herdam o anúncio do front** (`via='comprador'`), a não ser que a UTM
    da própria compra seja mais precisa. Sem compra de front antes: só entra se a UTM for de campanha DTL (`via='utm'`).
 
+6. **Só vendas com UTM do Trader Lucrativo** (pedido do cliente): a dash usa apenas `src='meta'` (Meta Ads · campanhas
+   DTL — UTM com nome, UTM antiga com ID ou `paid_metaads`). Upsell/downsell/Sala entram quando o **comprador** veio de
+   UTM do TL. Orgânico (bio, WhatsApp, e-mail, YouTube), Hotmart e sem UTM ficam **fora** (`OUTSIDE` em `app.js`): só
+   aparecem na KPI "Fora da dash" (Visão Geral) e no Gap de dados (Otimização), que mede o rastreio sobre TODAS as vendas.
+   Upsell/downsell comprados no fluxo (até ~1h do front) trazem a mesma UTM DTL do front (mesmo anúncio); os comprados
+   depois por recuperação (WhatsApp, webinário, página Hotmart) vêm sem UTM DTL e herdam o anúncio do comprador.
+
 Métricas (`derive` em `app.js`): `vendas` = compradores do front (CPA) · **Back** = upsell + downsell + Sala
 (tudo que o comprador do front compra depois) · **ROAS front** (só o produto de R$ 297) · **ROAS back** · **ROAS total**
 (front + back) — estas três colunas aparecem no funil, na tabela diária, nas tabelas Campanha/Conjunto/Anúncio e nas
