@@ -1146,6 +1146,19 @@ document.getElementById('updated').innerHTML='Última atualização:<br>'+B.gene
 document.getElementById('buildFoot').textContent='build '+B.build_id;
 document.getElementById('buildFoot2').textContent='· build '+B.build_id;
 
+/* aviso de dados do Meta desatualizados: a aba de Queries parou de atualizar (vendas seguem entrando,
+   mas sem gasto/impressões/checkouts os dias recentes ficam com CPA/ROAS errados) */
+(function staleMeta(){
+  const el=document.getElementById('staleBanner'), last=B.meta_date_max; if(!el||!last) return;
+  const lag=Math.round((new Date(TODAY+'T00:00:00')-new Date(last+'T00:00:00'))/86400000);
+  if(lag<2) return;
+  const nV=SALES.filter(s=>s.role==='front'&&s.d>last).length;
+  el.innerHTML=`<b>⚠ Dados do Meta Ads só até ${brdate(last)}</b> (${lag} dias atrás). A planilha de queries do Meta não atualiza desde então — `
+    +`as vendas da Hotmart continuam entrando (${intf(nV)} vendas do front depois de ${brdate(last)}), mas sem gasto, impressões e checkouts `
+    +`o <b>CPA e o ROAS desses dias ficam errados</b>. Atualize a query do Meta (planilha "QUERIES TDL META") e ative a atualização automática.`;
+  el.hidden=false;
+})();
+
 syncDateInputs();
 setPage((location.hash||'#geral').slice(1));
 

@@ -461,3 +461,9 @@
   .rp.z{background:var(--pill-zero); color:var(--muted)}
   .rp-none{color:var(--muted)}
   .note .rp{min-width:0; padding:0 7px; font-size:10.5px}
+
+  /* aviso de dados do Meta desatualizados (topo do conteúdo) */
+  .stale-banner{background:color-mix(in srgb,var(--yellow) 14%,var(--surface)); border:1px solid color-mix(in srgb,var(--yellow) 45%,var(--border));
+    border-left:4px solid var(--yellow); border-radius:12px; padding:11px 15px; margin:0 0 16px; font-size:12.5px; line-height:1.5; color:var(--ink)}
+  .stale-banner[hidden]{display:none}
+  .stale-banner b{color:var(--yellow)}

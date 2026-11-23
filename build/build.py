@@ -744,6 +744,7 @@ def process(vendas_rows, meta_rows):
             "today": hoje_conta.strftime("%Y-%m-%d"),
             "date_min": meta_dates[0] if meta_dates else (dates[0] if dates else None),
             "date_max": dates[-1] if dates else None,
+            "meta_date_max": meta_dates[-1] if meta_dates else None,   # último dia na aba de Queries do Meta
             "tax_factor": TAX_FACTOR,
             "account_tz": ACCOUNT_TZ_NAME,
             "client_name": CLIENT_NAME,
@@ -862,7 +863,7 @@ def main():
           file=sys.stderr)
     print(f"  ID->campanha aprendido: {len(b['camp_id_map'])} · Queries com colunas de ID: {b['meta_has_ids']}",
           file=sys.stderr)
-    print(f"  meta       : {len(data['meta'])} linhas · gasto R$ {sp:,.2f} (sem imposto; fator {TAX_FACTOR})",
+    print(f"  meta       : último dia {b['meta_date_max']} · {len(data['meta'])} linhas · gasto R$ {sp:,.2f} (sem imposto; fator {TAX_FACTOR})",
           file=sys.stderr)
     print(f"  out        : {args.out}", file=sys.stderr)
 
