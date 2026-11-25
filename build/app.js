@@ -548,23 +548,30 @@ function renderGeralCore(ids){
   hbar(ids.plat, countBy(mS,s=>s.plat), x=>x.n, ()=>cvar('--chart-vendas'));
   hbar(ids.pos, countBy(mS,s=>s.pos), x=>x.n, ()=>cvar('--chart-back'), 10);
   const dl=dd.slice().reverse();
-  renderTable({id:ids.daily, cols:DAILY_COLS, center:true, fit:true,
+  renderTable({id:ids.daily, cols:DAILY_COLS, center:true,
     rows:dl.map(x=>{const d=derive(x); return {k:x.d, cells:dailyCells(x,d)};}),
     total:(()=>{const d=derive(t);return dailyCells({...t,d:null},d,true);})(),
     selectable:true, selSet:STATE.selDays,
     onSelect:(k,e)=>{ toggleSet(STATE.selDays,k,e&&(e.ctrlKey||e.metaKey)); syncDateInputs(); renderAll(); },
   });
 }
+/* Tabela diária (Visão Geral, Meta Ads e Insights): mesmas colunas das tabelas Campanha/Conjunto/Anúncio.
+   Data + Dia ficam fixos à esquerda (stk:'l'); o resto rola na horizontal dentro do painel. */
 const DAILY_COLS=[
-  {key:'date',label:'Data',type:'date',w:84},{key:'wd',label:'Dia',type:'dim',w:46},
-  {key:'gasto',label:'Gasto',type:'brl',heat:'gasto'},
-  {key:'ic',label:'Checkouts',type:'int'},
+  {key:'date',label:'Data',type:'date',w:106,stk:'l'},{key:'wd',label:'Dia',type:'html',w:54,stk:'l'},
+  {key:'gasto',label:'Gasto',type:'brl',heat:'gasto'},{key:'im',label:'Impr.',type:'int'},{key:'cpm',label:'CPM',type:'brl'},
+  {key:'cl',label:'Cliques',type:'int'},{key:'ctr',label:'CTR',type:'pct'},{key:'cpc',label:'CPC',type:'brl'},
+  {key:'lpv',label:'Views pág.',type:'int'},{key:'connect',label:'Connect',type:'pct'},
+  {key:'ic',label:'Checkouts',type:'int'},{key:'cpic',label:'Custo/IC',type:'brl'},
   {key:'vendas',label:'Vendas',type:'int',heat:'vendas'},{key:'cpa',label:'CPA',type:'brl'},
-  {key:'fat',label:'Fat. total',type:'brl'},{key:'roasF',label:'ROAS front',type:'num2'},{key:'roas',label:'ROAS total',type:'num2',heat:'roas'},
+  {key:'vu',label:'Upsells',type:'int'},{key:'vdn',label:'Downsells',type:'int'},{key:'vl',label:'Sala',type:'int'},
+  {key:'fat',label:'Fat. total',type:'brl'},{key:'roasF',label:'ROAS front',type:'num2'},
+  {key:'roasB',label:'ROAS back',type:'num2'},{key:'roas',label:'ROAS total',type:'num2',heat:'roas'},
 ];
 function dailyCells(x,d,isTotal){
-  return {date:isTotal?null:x.d, wd:isTotal?'':weekday(x.d), gasto:d.gasto, cpm:d.cpm, ctr:d.ctr, connect:d.connect,
-    ic:d.ic, vendas:d.vendas, cpa:d.cpa, fat:d.fatTotal, roasF:d.roasFront, roas:d.roasTotal};
+  return {date:isTotal?null:x.d, wd:isTotal?'':weekday(x.d), gasto:d.gasto, im:x.im, cpm:d.cpm, cl:x.cl, ctr:d.ctr, cpc:d.cpc,
+    lpv:x.lpv, connect:d.connect, ic:d.ic, cpic:d.cpic, vendas:d.vendas, cpa:d.cpa, vu:x.vu, vdn:x.vdn, vl:x.vl,
+    fat:d.fatTotal, roasF:d.roasFront, roasB:d.roasBack, roas:d.roasTotal};
 }
 
 /* ---------------- Sala Educacional · evento de terça (LTV) ----------------
@@ -642,7 +649,7 @@ function renderMeta(){
       {key:'ic',label:'Checkouts',type:'int'}],
     rows:topRows});
   const dl=dMeta.slice().reverse();
-  renderTable({id:'tDaily', cols:DAILY_COLS, center:true, fit:true,
+  renderTable({id:'tDaily', cols:DAILY_COLS, center:true,
     rows:dl.map(x=>{const d=derive(x); return {k:x.d, cells:dailyCells(x,d)};}),
     total:(()=>{const d=derive(t);return dailyCells({...t,d:null},d,true);})(),
     selectable:true, selSet:STATE.selDays,
